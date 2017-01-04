@@ -26,6 +26,7 @@ search_colname = function(df, name) {
 }
 
 # Function for cross validation
+	# ncv : cross validation number
 do.cv <- function(var, ncv) {
 	ret <- c()
 	for (i in 1:100) {
@@ -91,7 +92,8 @@ ova.db.csv <- ova.db.csv[,-idx]
 options(warn=2);
 
 # Find and remove/modify columns w/ non-numeric data
-idx <- which(apply(ova.db.csv, 2, function(v) class(try(as.numeric(v), T))=='try-error'))	# non-numeric indices
+	#idx : non-numeric indices
+idx <- which(apply(ova.db.csv, 2, function(v) class(try(as.numeric(v), T))=='try-error'))
 options(warn=1);
 
 	# Convert date info into numeric data (YYYYMMDD)
@@ -169,14 +171,15 @@ colnames(vars) = c("Recurrence","Platinum_resistance","PFS","OS","Op. Debulking"
 ##### ============================================================================================
 ##### ============================================================================================
 
-# Find variables in ova.db.csv w/ colnames corresponding to those listed in each element of 'vars'
-cols <- list()
+# exp_vars : variables in ova.db.csv w/ colnames corresponding to those listed in each element of 'vars'
+# (explanatory variables)
+exp_vars <- list()
 for (i in 1:ncol(vars)) {
-  cols[[i]] <- na.omit(colnames(ova.db.csv)[tolower(colnames(ova.db.csv)) %in% tolower(vars[,i])])
+  exp_vars[[i]] <- na.omit(colnames(ova.db.csv)[tolower(colnames(ova.db.csv)) %in% tolower(vars[,i])])
 }
 
 # # Generate a count table of values per each variable listed in element 'set_num' of 'col'
-# tbl <- apply(ova.db.csv[,cols[[set_num]]], 2, table)
+# tbl <- apply(ova.db.csv[,exp_vars[[set_num]]], 2, table)
 # 
 # # newcols : Exclude from tbl the names of binary variables w/ ratio b/w major and minor items < 0.05
 # newcols <- names(which(unlist(lapply(tbl, function(v) {
@@ -184,30 +187,8 @@ for (i in 1:ncol(vars)) {
 # }))))
 
 # # newcols2 : Choose variables among newcols w/o NA
-# newcols2 <- names(which((colSums(is.na(ova.db.csv[,newcols])) / nrow(ova.db.csv)) == 0)) 
+# newcols2 <- names(which((colSums(is.na(ova.db.csv[,newcols])) / nrow(ova.db.csv)) == 0))
 
-##### ============================================================================================
-##### ============================================================================================
-##### ============ Data Analysis : Correlation check ==============
-##### ============================================================================================
-##### ============================================================================================
-
-# Calculate inter-variable correlation and plot significant correlations - Unnecessary
-# if (0) {
-#   # Calculate pairwise correlation b/w variables in 'cols[[set_num]]'
-#   vv <- cor(ova.db.csv[,cols[[set_num]]], use="pair")
-#   
-#   # Nullify correlations < 0.5
-#   vv[abs(vv) < 0.5] <- 0
-#   
-#   # Find variables w/ correlation sum > 1 and discard other variables
-#   vx <- vv[colSums(abs(vv)) > 1, colSums(abs(vv)) > 1] 
-#   
-#   # Plot the above data and draw grids
-#   image(vx, xaxt='n', yaxt='n', zlim=c(-1,1)); box()
-#   axis(1, seq(0, 1, length.out=nrow(vx)), labels=rep("", nrow(vx)))
-#   text(seq(0, 1, length.out=nrow(vx)), par("usr")[1]-0.05, srt=-45, adj=0, labels=colnames(vx), xpd=T)
-# }
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -243,7 +224,7 @@ testset = testset[testset %in% colnames(ova.db.csv)]
 ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 
 # # Run regressions b/w the interested response variable and the explanatory variables in 'vars[,set_num]'
-# mod <- glm( paste(testset, "~", paste(cols[[set_num]], collapse="+") ),
+# mod <- glm( paste(testset, "~", paste(exp_vars[[set_num]], collapse="+") ),
 # 		    data = ova.db.csv.sub, family = "binomial")
 # nul <- glm(paste(testset, "~1"), data = ova.db.csv.sub, family = "binomial")
 # step.0 <- stepAIC(nul, scope=list(lower=nul,upper=mod), direction="both")
@@ -257,13 +238,13 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 # 
 # 
 # # Picked 
-# var.full <- setdiff(cols[[set_num]], substr(as.character(step.f$anova$Step), 3, 1000))
+# var.full <- setdiff(exp_vars[[set_num]], substr(as.character(step.f$anova$Step), 3, 1000))
 # mean(do.cv(var.full, 3)$auc)
 # var.full <- substr(as.character(step.0$anova$Step), 3, 1000)[-1]
 # mean(do.cv(var.full, 3)$auc)
 # 
 # 
-# var.full <- setdiff(cols[[set_num]], substr(as.character(step.fx$anova$Step), 3, 1000))
+# var.full <- setdiff(exp_vars[[set_num]], substr(as.character(step.fx$anova$Step), 3, 1000))
 # mean(do.cv(var.full, 3)$auc)
 # var.full <- substr(as.character(step.0x$anova$Step), 3, 1000)[-1]
 # mean(do.cv(var.full, 3)$auc)
@@ -279,13 +260,14 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 # n : Size of data in ova.db.csv.sub
 n <- nrow(ova.db.csv.sub)
 
-# Evaluate the performance of individual variables in cols[[set_num]]
-rex <- matrix(nr=length(cols[[set_num]]),nc=100)
-for (i in 1:length(cols[[set_num]])) {
-  ret <- do.cv(cols[[set_num]][i], 3)$auc
+# Evaluate the performance of individual variables in exp_vars[[set_num]]
+rex <- matrix(nr = length(exp_vars[[set_num]]), nc = 100)
+
+for (i in 1:length(exp_vars[[set_num]])) {
+  ret <- do.cv(exp_vars[[set_num]][i], 3)$auc
   rex[i,] = ret
 }
-rownames(rex) <- cols[[set_num]]
+rownames(rex) <- exp_vars[[set_num]]
 
 # Discard variables w/ mean AUC <= 0.7
 req <- t(rex)[,which(colMeans(t(rex)) > 0.7)]
