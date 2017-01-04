@@ -14,11 +14,15 @@ setwd(wd)
 ##### ============================================================================================
 ##### ============================================================================================
 
-# Date-to-int conversion function (days since 1900-01-01)
+# Date-to-int conversion function 				### TODO convert to days since 1900-01-01
 date_conv = function(date_string) {
 	date = as.vector(sapply(strsplit(date_string,split="\\."),strtoi))
 	date = sum(date*c(10000,100,1))
 	return(date)
+}
+
+search_colname = function(df, name) {
+	return(grep(name, colnames(df)))
 }
 
 ##### ============================================================================================
@@ -41,12 +45,6 @@ for (i in 1:ncol(ova.db.csv)) {
     ova.db.csv[which(NAval[i] == ova.db.csv[,i]),i] <- NA
   }
 }
-
-# # Change empty strings to NA
-# ova.db.csv = apply(ova.db.csv,2,
-# 				   function(v) { if(class(try(as.numeric(v), T))=='try-error') 
-# 				   					sapply(v, function(vv) { if(vv == "") vv = NA }) })
-
 
 # Specific deletions (flaws)
 	# Delete unnamed columns
@@ -118,6 +116,9 @@ idx <- which(apply(ova.db.csv, 2, function(v) sum(is.na(v)))/nrow(ova.db.csv) > 
 ova.db.csv <- ova.db.csv[,-idx]
 options(warn=2)
 
+# Check preprocessing results
+apply(ova.db.csv,2,function(v) class(v))
+
 # Convert 'Refractory progression during CTx' to 'Yes'
 ova.db.csv$Recurrence[ova.db.csv$Recurrence==2] <- 1
 
@@ -147,10 +148,8 @@ colnames(vars) = c("Recurrence","Platinum_resistance","PFS","OS","Op. Debulking"
 # Find variables in ova.db.csv w/ colnames corresponding to those listed in each element of 'vars'
 cols <- list()
 for (i in 1:ncol(vars)) {
-  cols[[i]] <- na.omit(colnames(ova.db.csv)[colnames(ova.db.csv) %in% vars[,i]])
-  #ova.db.csv[,cols[[i]]]
+  cols[[i]] <- na.omit(colnames(ova.db.csv)[tolower(colnames(ova.db.csv)) %in% tolower(vars[,i])])
 }
-vars[which(is.na(match(tolower(vars[,1]), tolower(colnames(ova.db.csv))))), 1]    # ???????
 
 # Choose response variable and explanatory variable sets
 resp_var = 1
@@ -189,9 +188,6 @@ resp_var = 1
 #   text(seq(0, 1, length.out=nrow(vx)), par("usr")[1]-0.05, srt=-45, adj=0, labels=colnames(vx), xpd=T)
 # }
 
-#colSums(is.na(ova.db.csv[,newcols2])) / nrow(ova.db.csv)       # ???????
-
-
 ##### ============================================================================================
 ##### ============================================================================================
 ##### ============ Data Analysis : Regression ==============
@@ -213,10 +209,13 @@ outcome_index = c("CR",
 				  "AX", "AY")
 outcome_idx = 1
 
-# Submatrix of ova.db.csv of rows w/ "Recurrence" value != NA
+# Check availability of the above desired outcome variables
+avail = outcomes[outcomes %in% colnames(ova.db.csv)]
+
+# Submatrix of ova.db.csv of rows w/ "outcomes[outcome_idx]" column value != NA
 ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[outcomes[outcome_idx]]),]
 
-# Run regressions b/w the interested response variable and the explanatory variables in 'vars[,1]'
+# Run regressions b/w the interested response variable and the explanatory variables in 'vars[,resp_var]'
 mod <- glm(paste(outcomes[outcome_idx], "~", paste(cols[[resp_var]],collapse="+")),
 		   data = ova.db.csv.sub, family = "binomial")
 nul <- glm(paste(outcomes[outcome_idx], "~1"), data = ova.db.csv.sub)
