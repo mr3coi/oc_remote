@@ -59,7 +59,7 @@ ova.db.csv = ova.db.csv[,-which(colnames(ova.db.csv)=="Pt_No.1")]
 # Alter column names to main titles (removing choices) and remove spaces within the main titles
 colnames(ova.db.csv) = gsub(" ", "_", sapply(strsplit(colnames(ova.db.csv),"\\n"),function(v)trimws(v[1]))) 
 
-# Find indices of columns w/ (almost) uniform values and remove such columns								### ALMOST
+# Find indices of columns w/ (almost) uniform values and remove such columns				### TODO almost
 idx <- which( apply(ova.db.csv, 2, function(v) length(table(v)) == 1) )
 ova.db.csv <- ova.db.csv[,-idx] 
 
@@ -83,9 +83,6 @@ for (col in idx) {
 	}
 }
 idx = idx[!idx %in% idx2]
-
-#idx[!idx %in% idx2]
-#length(colnames(ova.db.csv))
 
 	# Additional manipulation for 'Stage' column
 ref = 1:10
@@ -113,8 +110,6 @@ idx = idx[!idx %in% idx2]
 	# Delete the remaining non-numeric columns
 ova.db.csv <- ova.db.csv[,-idx]
 
-#length(colnames(ova.db.csv))
-
 # Convert character values in ova.db.csv into numeric values
 ova.db.csv <- as.data.frame(apply(ova.db.csv, 2, as.numeric))
 
@@ -123,14 +118,8 @@ idx <- which(apply(ova.db.csv, 2, function(v) sum(is.na(v)))/nrow(ova.db.csv) > 
 ova.db.csv <- ova.db.csv[,-idx]
 options(warn=2)
 
-#length(colnames(ova.db.csv))
-
-
 # Convert 'Refractory progression during CTx' to 'Yes'
 ova.db.csv$Recurrence[ova.db.csv$Recurrence==2] <- 1
-
-# n : Size of data in ova.db.csv.sub
-n <- nrow(ova.db.csv.sub)
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -262,6 +251,9 @@ mean(do.cv(var.full, 3)$auc)
 # =============== Evaluate (Cross-Validation) ===============
 ##### ============================================================================================
 ##### ============================================================================================
+
+# n : Size of data in ova.db.csv.sub
+n <- nrow(ova.db.csv.sub)
 
 # Function for cross validation
 do.cv <- function(var, ncv) {
