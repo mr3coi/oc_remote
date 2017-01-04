@@ -220,8 +220,9 @@ set_num = 1
 testset = outcomes[outcome_idx[[set_num]]]
 testset = testset[testset %in% colnames(ova.db.csv)]
 
-# Submatrix of ova.db.csv of rows w/ "testset" column value != NA
-ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
+# ova.db.csv.sub : Submatrix of ova.db.csv of rows w/ "testset" column value != NA
+# 				   and columns corresponding to post-surgery removed
+ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db.csv,"Residual_tumor_size_1st")]
 
 # # Run regressions b/w the interested response variable and the explanatory variables in 'vars[,set_num]'
 # mod <- glm( paste(testset, "~", paste(exp_vars[[set_num]], collapse="+") ),
@@ -274,9 +275,6 @@ req <- t(rex)[,which(colMeans(t(rex)) > 0.7)]
 
 # Rearrange rows of 'req' in decreasing order (column means)
 req <- req[,order(colMeans(req), decreasing=T)]
-
-
-
 
 
 ##### ============================================================================================
