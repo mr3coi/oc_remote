@@ -221,8 +221,7 @@ testset = outcomes[outcome_idx[[set_num]]]
 testset = testset[testset %in% colnames(ova.db.csv)]
 
 # ova.db.csv.sub : Submatrix of ova.db.csv of rows w/ "testset" column value != NA
-# 				   and columns corresponding to post-surgery removed
-ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db.csv,"Residual_tumor_size_1st")]
+ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 
 # # Run regressions b/w the interested response variable and the explanatory variables in 'vars[,set_num]'
 # mod <- glm( paste(testset, "~", paste(exp_vars[[set_num]], collapse="+") ),
@@ -251,7 +250,6 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db
 # mean(do.cv(var.full, 3)$auc)
 
 
-
 ##### ============================================================================================
 ##### ============================================================================================
 # =============== Evaluate (Cross-Validation) ===============
@@ -262,13 +260,19 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db
 n <- nrow(ova.db.csv.sub)
 
 # Evaluate the performance of individual variables in exp_vars[[set_num]]
-rex <- matrix(nr = length(exp_vars[[set_num]]), nc = 100)
+	# Avoid all columns corresponding to post-surgery
+avoid = search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
+	# Add other pre/during-surgery columns that are obviously meaningless or irrelevant
+avoid = c(avoid, 1:3, 5)
+rex <- matrix(nr = length(colnames(ova.db.csv)[-avoid]), nc = 100)
+rownames(rex) <- colnames(ova.db.csv.sub)[-avoid]
+options(warn=1)
 
-for (i in 1:length(exp_vars[[set_num]])) {
-  ret <- do.cv(exp_vars[[set_num]][i], 3)$auc
-  rex[i,] = ret
+for (i in 1:nrow(rex)) {
+	print(i)
+	ret <- do.cv(colnames(ova.db.csv.sub)[-avoid][i], 3)$auc
+	rex[i,] = ret
 }
-rownames(rex) <- exp_vars[[set_num]]
 
 # Discard variables w/ mean AUC <= 0.7
 req <- t(rex)[,which(colMeans(t(rex)) > 0.7)]
@@ -296,10 +300,10 @@ barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC",
         main="Individual variable prediction performance w/ AUC < 0.6"); box()
 grid(NA, 5, lwd=2)
 
-# Plot the colMeans in another way(???)
-par(new=T)
-barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
-        main="Individual variable prediction performance w/ AUC<0.6");box();
+# # Plot the colMeans in another way(???)
+# par(new=T)
+# barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
+#         main="Individual variable prediction performance w/ AUC<0.6");box();
 
 # Add variable labels to plot
 end_point = 0.5 + ncol(req) + ncol(req) - 1 
