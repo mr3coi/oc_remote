@@ -217,8 +217,9 @@ avail = outcomes[outcomes %in% colnames(ova.db.csv)]
 
 # Choose which set of response variable and explanatory variables to analyze
 set_num = 1
+var_num = 1
 testset = outcomes[outcome_idx[[set_num]]]
-testset = testset[testset %in% colnames(ova.db.csv)]
+testset = testset[testset %in% colnames(ova.db.csv)][var_num]
 
 # ova.db.csv.sub : Submatrix of ova.db.csv of rows w/ "testset" column value != NA
 ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
