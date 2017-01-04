@@ -1,6 +1,6 @@
-wd <- "C:/Users/SYEE/Downloads" 
-datafile <- "ova_db_new2.csv" 
-varfile <- "ova_variable_v2.csv" 
+wd <- "/Users/SJC/Documents/practice/internship"
+datafile <- "ova_db.csv" 
+varfile <- "ova_variable.csv" 
 
 setwd(wd) 
 
@@ -88,7 +88,7 @@ newcols1 <- na.omit(colnames(ova.db.csv.sub)[match(tolower(vars[,X]),
                                                    tolower(colnames(ova.db.csv.sub)))]) 
 
 
-mod <- glm(paste(XX[X], "~",paste(newcols2,collapse="+")), data=ova.db.csv.sub, family="binomial") 
+mod <- glm(paste(XX[X], "~",paste(newcols1,collapse="+")), data=ova.db.csv.sub, family="binomial") 
 nul <- glm(paste(XX[X], "~1"), data=ova.db.csv.sub) 
 step.0 <- stepAIC(nul, scope=list(lower=nul,upper=mod), direction="both") 
 step.0x <- step(nul, scope=list(lower=nul,upper=mod), direction="both") 

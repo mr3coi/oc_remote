@@ -31,12 +31,12 @@ do.cv <- function(var, ncv) {
 	for (i in 1:100) {
 		# Sample round(n/ncv) rows to exclude from ova.db.csv.sub while model generation
 		idx <- sample(1:n)[1:round(n/ncv)]
-		curmod <- glm(paste(outcomes[outcome_idx[[anal_set]]], "~",paste(var,collapse="+")),
+		curmod <- glm(paste(testset, "~",paste(var,collapse="+")),
 					  data=ova.db.csv.sub[-idx,], family="binomial")
 		
 		# Generate predictions using the above model and previously-excluded rows in ova.db.csv.sub
 		curpr <- predict(curmod, ova.db.csv.sub[idx,], type="response")
-		curpr <- prediction(curpr, ova.db.csv.sub[idx,outcomes[outcome_idx[[anal_set]]]])
+		curpr <- prediction(curpr, ova.db.csv.sub[idx,testset])
 		
 		# Calculate the performance of the above model
 		prof <- performance(curpr, measure="tpr", x.measure="fpr")
@@ -175,8 +175,8 @@ for (i in 1:ncol(vars)) {
   cols[[i]] <- na.omit(colnames(ova.db.csv)[tolower(colnames(ova.db.csv)) %in% tolower(vars[,i])])
 }
 
-# # Generate a count table of values per each variable listed in element 'anal_set' of 'col'
-# tbl <- apply(ova.db.csv[,cols[[anal_set]]], 2, table)
+# # Generate a count table of values per each variable listed in element 'set_num' of 'col'
+# tbl <- apply(ova.db.csv[,cols[[set_num]]], 2, table)
 # 
 # # newcols : Exclude from tbl the names of binary variables w/ ratio b/w major and minor items < 0.05
 # newcols <- names(which(unlist(lapply(tbl, function(v) {
@@ -194,8 +194,8 @@ for (i in 1:ncol(vars)) {
 
 # Calculate inter-variable correlation and plot significant correlations - Unnecessary
 # if (0) {
-#   # Calculate pairwise correlation b/w variables in 'cols[[anal_set]]'
-#   vv <- cor(ova.db.csv[,cols[[anal_set]]], use="pair")
+#   # Calculate pairwise correlation b/w variables in 'cols[[set_num]]'
+#   vv <- cor(ova.db.csv[,cols[[set_num]]], use="pair")
 #   
 #   # Nullify correlations < 0.5
 #   vv[abs(vv) < 0.5] <- 0
@@ -215,9 +215,6 @@ for (i in 1:ncol(vars)) {
 ##### ============================================================================================
 ##### ============================================================================================
 
-# Choose which set of response variable and explanatory variables to analyze
-anal_set = 1
-
 # Interested response variables
 outcomes = c("Recurrence",
 			  "Platinum_resistance_6mo", "Platinum-resistance_group",
@@ -225,6 +222,7 @@ outcomes = c("Recurrence",
 			  "Dx_date", "Death", "Last_FU_Date", "Expired_Date",
 			  "Residual_tumor_site_1st_debulking", "Residual_tumor_size_1st_debulking",
 			  "PLN_status", "PALN_status")
+# Reference
 outcome_index = c("CR",
 				  "CS", "CT",
 				  "CO", "BF",
@@ -236,34 +234,39 @@ outcome_idx = list(1,2:3,4:5,6:9,10:11,12:13)
 # Check availability of the above desired outcome variables
 avail = outcomes[outcomes %in% colnames(ova.db.csv)]
 
-# Submatrix of ova.db.csv of rows w/ "outcomes[outcome_idx[[anal_set]]]" column value != NA
-ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[outcomes[outcome_idx[[anal_set]]]]),]
+# Choose which set of response variable and explanatory variables to analyze
+set_num = 1
+testset = outcomes[outcome_idx[[set_num]]]
+testset = testset[testset %in% colnames(ova.db.csv)]
 
-# Run regressions b/w the interested response variable and the explanatory variables in 'vars[,anal_set]'
-mod <- glm(paste(outcomes[outcome_idx[[anal_set]]], "~", paste(cols[[anal_set]],collapse="+")),
-		   data = ova.db.csv.sub, family = "binomial")
-nul <- glm(paste(outcomes[outcome_idx[[anal_set]]], "~1"), data = ova.db.csv.sub)
-step.0 <- stepAIC(nul, scope=list(lower=nul,upper=mod), direction="both")
-#step.0x <- step(nul, scope=list(lower=nul,upper=mod), direction="both")
-step.f <- stepAIC(mod, direction="both")
-#step.fx <- step(mod, direction="both")
+# Submatrix of ova.db.csv of rows w/ "testset" column value != NA
+ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 
-# Show ANOVA tables from the above regressions
-step.0$anova
-step.f$anova
-
-
-# Picked 
-var.full <- setdiff(cols[[anal_set]], substr(as.character(step.f$anova$Step), 3, 1000))
-mean(do.cv(var.full, 3)$auc)
-var.full <- substr(as.character(step.0$anova$Step), 3, 1000)[-1]
-mean(do.cv(var.full, 3)$auc)
-
-
-var.full <- setdiff(cols[[anal_set]], substr(as.character(step.fx$anova$Step), 3, 1000))
-mean(do.cv(var.full, 3)$auc)
-var.full <- substr(as.character(step.0x$anova$Step), 3, 1000)[-1]
-mean(do.cv(var.full, 3)$auc)
+# # Run regressions b/w the interested response variable and the explanatory variables in 'vars[,set_num]'
+# mod <- glm( paste(testset, "~", paste(cols[[set_num]], collapse="+") ),
+# 		    data = ova.db.csv.sub, family = "binomial")
+# nul <- glm(paste(testset, "~1"), data = ova.db.csv.sub, family = "binomial")
+# step.0 <- stepAIC(nul, scope=list(lower=nul,upper=mod), direction="both")
+# #step.0x <- step(nul, scope=list(lower=nul,upper=mod), direction="both")
+# step.f <- stepAIC(mod, direction="both")
+# #step.fx <- step(mod, direction="both")
+# 
+# # Show ANOVA tables from the above regressions
+# step.0$anova
+# step.f$anova
+# 
+# 
+# # Picked 
+# var.full <- setdiff(cols[[set_num]], substr(as.character(step.f$anova$Step), 3, 1000))
+# mean(do.cv(var.full, 3)$auc)
+# var.full <- substr(as.character(step.0$anova$Step), 3, 1000)[-1]
+# mean(do.cv(var.full, 3)$auc)
+# 
+# 
+# var.full <- setdiff(cols[[set_num]], substr(as.character(step.fx$anova$Step), 3, 1000))
+# mean(do.cv(var.full, 3)$auc)
+# var.full <- substr(as.character(step.0x$anova$Step), 3, 1000)[-1]
+# mean(do.cv(var.full, 3)$auc)
 
 
 
@@ -276,13 +279,13 @@ mean(do.cv(var.full, 3)$auc)
 # n : Size of data in ova.db.csv.sub
 n <- nrow(ova.db.csv.sub)
 
-# Evaluate the performance of individual variables in cols[[anal_set]]
-rex <- matrix(nr=length(cols[[anal_set]]),nc=100)
-for (i in 1:length(cols[[anal_set]])) {
-  ret <- do.cv(cols[[anal_set]][i], 3)$auc
+# Evaluate the performance of individual variables in cols[[set_num]]
+rex <- matrix(nr=length(cols[[set_num]]),nc=100)
+for (i in 1:length(cols[[set_num]])) {
+  ret <- do.cv(cols[[set_num]][i], 3)$auc
   rex[i,] = ret
 }
-rownames(rex) <- cols[[anal_set]]
+rownames(rex) <- cols[[set_num]]
 
 # Discard variables w/ mean AUC <= 0.7
 req <- t(rex)[,which(colMeans(t(rex)) > 0.7)]
