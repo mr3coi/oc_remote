@@ -77,7 +77,7 @@ pattern = "\\d+\\.\\d+\\.\\d+"
 idx2 = c()
 
 for (col in idx) {
-	if (sum(is.na(ova.db.csv[,col])) == 0 && length(grep(pattern,ova.db.csv[,col])) != 0) {
+	if (sum(is.na(ova.db.csv[,col])) == 0 && length(grep(pattern,ova.db.csv[,col])) != 0) {		### TODO Optimize
 		ova.db.csv[,col] = sapply(ova.db.csv[,col], function(str) {ifelse(str != "", date_conv(str), NA)} )
 		idx2 = c(idx2,col)
 	}
@@ -96,12 +96,14 @@ for (i in 1:nrow(ova.db.csv)) {
 idx = idx[names(idx)!="Stage"]
 
 	# Additional manipulation for 'Recur_Site' column
+ova.db.csv[,84] = sapply(ova.db.csv[,84],function(v) { paste(sort(unlist(strsplit(v,split=","))),collapse="") })
+idx = idx[names(idx)!="Recur_Site"]
 
 	# Extract numeric values at the beginning
 pattern = "(\\d).*"
 idx2 = c()
 for (col in idx) {
-	if (length(grep(pattern,ova.db.csv[,col])) != 0) {
+	if (length(grep(pattern,ova.db.csv[,col])) != 0) {				### TODO Optimize
 		ova.db.csv[,col] = sub(pattern,"\\1",ova.db.csv[,col])
 		idx2 = c(idx2,col)
 	}
@@ -113,6 +115,9 @@ ova.db.csv <- ova.db.csv[,-idx]
 
 #length(colnames(ova.db.csv))
 
+# Convert character values in ova.db.csv into numeric values
+ova.db.csv <- as.data.frame(apply(ova.db.csv, 2, as.numeric))
+
 # Find and remove columns w/ NA/total ratio > 0.2
 idx <- which(apply(ova.db.csv, 2, function(v) sum(is.na(v)))/nrow(ova.db.csv) > 0.2)
 ova.db.csv <- ova.db.csv[,-idx]
@@ -120,8 +125,6 @@ options(warn=2)
 
 #length(colnames(ova.db.csv))
 
-# Convert character values in ova.db.csv into numeric values
-ova.db.csv <- as.data.frame(apply(ova.db.csv, 2, as.numeric))
 
 # Convert 'Refractory progression during CTx' to 'Yes'
 ova.db.csv$Recurrence[ova.db.csv$Recurrence==2] <- 1
