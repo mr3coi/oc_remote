@@ -95,9 +95,19 @@ for (i in 1:nrow(ova.db.csv)) {
 }
 idx = idx[names(idx)!="Stage"]
 
+	# Additional manipulation for 'Recur_Site' column
+
 	# Extract numeric values at the beginning
-pattern = c()			############################ EDIT ################################
-	
+pattern = "(\\d).*"
+idx2 = c()
+for (col in idx) {
+	if (length(grep(pattern,ova.db.csv[,col])) != 0) {
+		ova.db.csv[,col] = sub(pattern,"\\1",ova.db.csv[,col])
+		idx2 = c(idx2,col)
+	}
+}
+idx = idx[!idx %in% idx2]
+
 	# Delete the remaining non-numeric columns
 ova.db.csv <- ova.db.csv[,-idx]
 
