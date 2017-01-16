@@ -278,22 +278,6 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 # var.full <- substr(as.character(step.0x$anova$Step), 3, 1000)[-1]
 # mean(do.cv(var.full, 3)$auc)
 
-
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-=======
->>>>>>> parent of 1a59b3a... Added files (source2)
-=======
-
-
-
-
-
-
-
-
->>>>>>> single_var
 ##### ============================================================================================
 ##### ============================================================================================
 # =============== Evaluate (Cross-Validation) ===============

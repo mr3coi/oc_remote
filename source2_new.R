@@ -166,7 +166,7 @@ data(iris)
 
 preObj = preProcess(iris[,-5],method=c("center","scale"))
 iris_input = predict(preObj,iris)
-iris_input[,5] = as.factor(ifelse(input[,5]=="setosa",1,0))
+iris_input[,5] = as.factor(ifelse(iris_input[,5]=="setosa",1,0))
 colnames(iris_input)[5] = "setosa"
 
 
