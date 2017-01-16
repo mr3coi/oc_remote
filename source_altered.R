@@ -34,19 +34,19 @@ do.cv <- function(var, ncv, multi=F) {
 		# Sample round(n/ncv) rows to exclude from ova.db.csv.sub while model generation
 		idx <- sample(1:n)[1:round(n/ncv)]
 		if (multi) {
-			ova.db.csv.sub$testset2 = relevel(as.factor(ova.db.csv.sub[,testset]),
-											  ref=unique(ova.db.csv.sub[,testset])[1])
+			ova.db.csv.sub$resp_var2 = relevel(as.factor(ova.db.csv.sub[,resp_var]),
+											  ref=unique(ova.db.csv.sub[,resp_var])[1])
 			#var = var[sum(is.na(ova.db.csv.sub[,var]))==0]
-			curmod = multinom(testset2 ~ paste(var,collapse="+"), data=ova.db.csv.sub[-idx,])
+			curmod = multinom(resp_var2 ~ paste(var,collapse="+"), data=ova.db.csv.sub[-idx,])
 		}
 		else {
-			curmod <- glm(paste(testset, "~",paste(var,collapse="+")),
+			curmod <- glm(paste(resp_var, "~",paste(var,collapse="+")),
 					  	data=ova.db.csv.sub[-idx,], family="binomial")
 		}
 		
 		# Generate predictions using the above model and previously-excluded rows in ova.db.csv.sub
 		curpr <- predict(curmod, ova.db.csv.sub[idx,], type="response")
-		curpr <- prediction(curpr, ova.db.csv.sub[idx,testset])
+		curpr <- prediction(curpr, ova.db.csv.sub[idx,resp_var])
 		
 		# Calculate the performance of the above model
 		prof <- performance(curpr, measure="tpr", x.measure="fpr")
@@ -118,7 +118,7 @@ for (col in idx) {
 idx = idx[!idx %in% idx2]
 
 	# Additional manipulation for 'Stage' column
-ref = 1:10
+ref = c(rep(1,3),rep(2,3),rep(3,3),4)
 names(ref) = c("1a","1b","1c","2a","2b","2c","3a","3b","3c","4")
 for (i in 1:nrow(ova.db.csv)) {
 	ova.db.csv[i,"Stage"] = ref[ova.db.csv[i,"Stage"]]
@@ -219,7 +219,7 @@ for (i in 1:ncol(vars)) {
 
 ##### ============================================================================================
 ##### ============================================================================================
-##### ============ Data Analysis : Regression ==============
+##### ============ Data Analysis : Stepwise AIC ==============
 ##### ============================================================================================
 ##### ============================================================================================
 
@@ -246,16 +246,16 @@ avail = outcomes[outcomes %in% colnames(ova.db.csv)]
 # Choose which set of response variable and explanatory variables to analyze
 set_num = 1
 var_num = 1
-testset = outcomes[outcome_idx[[set_num]]]
-testset = testset[testset %in% colnames(ova.db.csv)][var_num]
+resp_var = outcomes[outcome_idx[[set_num]]]
+resp_var = resp_var[resp_var %in% colnames(ova.db.csv)][var_num]
 
-# ova.db.csv.sub : Submatrix of ova.db.csv of rows w/ "testset" column value != NA
-ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
+# ova.db.csv.sub : Submatrix of ova.db.csv of rows w/ "resp_var" column value != NA
+ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[resp_var]),]
 
 # # Run regressions b/w the interested response variable and the explanatory variables in 'vars[,set_num]'
-# mod <- glm( paste(testset, "~", paste(exp_vars[[set_num]], collapse="+") ),
+# mod <- glm( paste(resp_var, "~", paste(exp_vars[[set_num]], collapse="+") ),
 # 		    data = ova.db.csv.sub, family = "binomial")
-# nul <- glm(paste(testset, "~1"), data = ova.db.csv.sub, family = "binomial")
+# nul <- glm(paste(resp_var, "~1"), data = ova.db.csv.sub, family = "binomial")
 # step.0 <- stepAIC(nul, scope=list(lower=nul,upper=mod), direction="both")
 # #step.0x <- step(nul, scope=list(lower=nul,upper=mod), direction="both")
 # step.f <- stepAIC(mod, direction="both")
@@ -303,7 +303,7 @@ multi_var[3:length(multi_var)] = T
 
 for (i in 1:nrow(rex)) {
 	#print(i)
-	ret <- do.cv(colnames(ova.db.csv.sub)[-avoid][i], 3, multi=multi_var[testset])$auc
+	ret <- do.cv(colnames(ova.db.csv.sub)[-avoid][i], 3, multi=multi_var[resp_var])$auc
 	rex[i,] = ret
 }
 
@@ -338,13 +338,13 @@ par(mai=xxx)
 
 # Plot the colMeans of 'req' and draw dotted gridlines into the plot
 barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
-        main = paste(c(testset, "\nprediction performance w/ AUC > 0.7"),collapse="") ); box()
+        main = paste(c(resp_var, "\nprediction performance w/ AUC > 0.7"),collapse="") ); box()
 grid(NA, 5, lwd=2)
 
 # # Plot the colMeans in another way(???)
 # par(new=T)
 # barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
-#         main = paste(c(testset, "\nprediction performance w/ AUC > 0.7"),collapse="") ); box();
+#         main = paste(c(resp_var, "\nprediction performance w/ AUC > 0.7"),collapse="") ); box();
 
 # Add variable labels to plot
 end_point = 0.5 + ncol(req) + ncol(req) - 1 
