@@ -1,12 +1,27 @@
 ######################################################
-### Packages
+### Packages & Settings
 ######################################################
 
+library(glmnet)
 library(caret)
 library(AUC)
 library(e1071)
 library(ROCR)
 
+##### Load previously saved 'ova.db.csv'(preprocessed) from 'datafile', and 'vars' from 'varfile'
+wd <- "/Users/SJC/Documents/practice/internship"
+setwd(wd)
+load("ova.db.csv.RData")	# temporary source for 'ova.db.csv'
+load("marker.mat.RData")	# temporary source for 'marker.mat'
+
+
+
+
+######################################################
+### Utility Functions
+######################################################
+
+search_colname = function(df, name) { return(grep(name, colnames(df))) }
 
 
 
@@ -28,7 +43,7 @@ doRF = function(train.dat, test.dat, resp.ind, marker) {
 	model 	= train(f, data=train.dat, method="rf")
 #	model 	= train(train.dat[,-resp.ind],as.factor(train.dat[,resp.ind]), method="rf")		# factor here
 	pred	= predict(model,test.dat)
-	AUC 	= auc( roc(pred, as.factor(test.dat[,resp.ind])) )
+	AUC 	= AUC::auc( roc(pred, as.factor(test.dat[,resp.ind])) )
 	
 	return(AUC)
 }
@@ -43,7 +58,7 @@ doSVM = function(train.dat, test.dat, resp.ind, marker, kernel="radial") {
 	f 		= as.formula(paste(resp, "~", paste(vars[which(marker==1)],collapse="+")))
 	model 	= svm(f, data=train.dat, kernel=kernel, prob=T)
 	pred	= predict(model,test.dat, decision.values=T)
-	AUC 	= auc( roc(pred, as.factor(test.dat[,resp.ind])) )
+	AUC 	= AUC::auc( roc(pred, as.factor(test.dat[,resp.ind])) )
 	
 	return(AUC)
 }
@@ -67,7 +82,7 @@ doKNN = function(train.dat, test.dat, resp.ind, marker, NN) {
 # 	require(class)
 #  	pred 	= knn(train.dat[,-5],test.dat[,-5],train.dat[,5],k=NN,prob=T)
 
- 	AUC 	= auc( roc(pred, as.factor(test.dat[,resp])) )
+ 	AUC 	= AUC::auc( roc(pred, as.factor(test.dat[,resp])) )
  	
  	return(AUC)
 }
@@ -84,7 +99,7 @@ doLOGIT = function(train.dat, test.dat, resp.ind, marker) {
 	model 	= glm(f,family=binomial(link=logit),data=train.dat)
 	pred	= predict(model, test.dat, type="response")
 # 	pred 	= prediction(pred, te.grp, label.ordering = NULL)			### TODO fix to remove te.grp
-	AUC 	= auc( roc(pred, as.factor(test.dat[,resp.ind])) )
+	AUC 	= AUC::auc( roc(pred, as.factor(test.dat[,resp.ind])) )
 	
 	return(AUC)
 }
@@ -109,17 +124,12 @@ doLOGIT = function(train.dat, test.dat, resp.ind, marker) {
 # knn.NN		: # of nearest neighbors for kNN algorithm
 # svm.kernel	: type of kernel function to be used for SVM
 machine.learning = function(input, resp.ind, marker.mat, k, knn.NN=3, svm.kernel='radial') {
-	# Assert that the response variable column is a factor
-	if(!is.factor(input[,resp.ind])) {
-		stop("Make sure the column for response variable is a factor.")
-	}
+	### Assert that the response variable column is a factor
+	if(!is.factor(input[,resp.ind])) stop("Make sure the column for response variable is a factor.")
 	
 	result	= list()								# container for computed AUC results
 	algs	= c("RF", "SVM", "kNN", 'LOGISTIC')		# ML algorithms for computing AUC
- 	
-	### Preprocessing
- 	row_NA	= apply(input,1,function(v) {sum(is.na(v)) == 0})
-	input	= input[row_NA,]
+
  	
 	##### k-fold CV
 	folds	= createFolds(input[,resp.ind],k=k,returnTrain=F)			# create folds w/ specified k
@@ -161,21 +171,45 @@ machine.learning = function(input, resp.ind, marker.mat, k, knn.NN=3, svm.kernel
 ### Main Program
 ######################################################
 
-##### Sample data generation 
-data(iris)
+# ##### Sample data generation 
+# data(iris)
+# 
+# preObj = preProcess(iris[,-5],method=c("center","scale"))
+# iris_input = predict(preObj,iris)
+# iris_input[,5] = as.factor(ifelse(iris_input[,5]=="setosa",1,0))
+# colnames(iris_input)[5] = "setosa"
 
-preObj = preProcess(iris[,-5],method=c("center","scale"))
-iris_input = predict(preObj,iris)
-iris_input[,5] = as.factor(ifelse(iris_input[,5]=="setosa",1,0))
-colnames(iris_input)[5] = "setosa"
 
+
+##### Preprocess & Partition
+input 		= ova.db.csv				# input data.frame w/ response var. being a factor
+
+	### Avoid all columns corresponding to post-surgery
+avoid	= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
+
+	### Add other pre/during-surgery columns that are obviously meaningless or irrelevant
+avoid	= c(avoid, 1:3, 5, 43)
+input 	= input[,-avoid]		# matrix of explanatory variables
 
 ##### Define arguments
-input 		= iris_input						# input data.frame w/ response var. being a factor
-name 		= "setosa"							# response variable name
-resp.ind 	= which(colnames(input) == name)
+outcomes 	= c("Recurrence",
+			  "Platinum_resistance_6mo", "Platinum-resistance_group",
+			  "End_Date_1st_regimen", "Op_date",
+			  "Dx_date", "Death", "Last_FU_Date", "Expired_Date",
+			  "Residual_tumor_site_1st_debulking", "Residual_tumor_size_1st_debulking",
+			  "PLN_status", "PALN_status")
+name		= outcomes[1]						# the name of the response variable
+resp.ind 	= which(colnames(ova.db.csv) == name)
+input 		= cbind(input,as.factor(ova.db.csv[,resp.ind]))
+resp.ind 	= length(colnames(input))
+colnames(input)[resp.ind] = name
 k 			= 3									# number of folds for CV
-marker.mat 	= diag(x=1,nc=4,nr=4)				# choose marker sets
+#marker.mat = diag(x=1,nc=4,nr=4)				# choose marker sets
+
+
+### Preprocess 2 : remove all rows in 'input' w/ NA's
+row_NA	= apply(input,1,function(v) {sum(is.na(v)) == 0})
+input	= input[row_NA,]
 
 
 ##### call 'machine.learning'

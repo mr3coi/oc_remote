@@ -13,13 +13,22 @@ load("ova.db.csv.RData")
 
 
 
+######################################################
+### Utility Functions
+######################################################
+
+search_colname = function(df, name) { return(grep(name, colnames(df))) }
+
+
+
 
 ######################################################
 ### Functions
 ######################################################
 
-##### Returns variables selected by regularized regression (LASSO/Ridge) through CV
-# input		: input data (df)
+##### Returns variables selected by regularized regression (LASSO/Ridge) through CV.
+##### It is assumed that all rows w/ NA's are removed via preprocessing beforehand.
+# input.x/y	: input data (df) - explanatory variables / response variable
 # resp.ind	: column index of response variable
 # k			: fold number for CV
 # LASSO		: Choose b/w LASSO(T) and Ridge(F)
@@ -42,6 +51,8 @@ regular.CV = function(input.x, input.y, resp.ind, k=3, LASSO=T, thres=10^(-5), c
 	model	= cv.glmnet(x.train, y.train, alpha=ifelse(LASSO,1,0),
 					  family="binomial", nfolds=k, nlambda=50,
 					  type.measure=crit)
+	
+	##### Plot the generated model
 	#plot(model,xvar="lambda",label=T)
 	
 	##### Variable selection based on regularized regression
@@ -99,13 +110,11 @@ y 	= as.matrix(input[,resp.ind])	# vector of response variable
 result_auc	= regular.CV(x,y, resp.ind, crit="auc"); result_auc
 result_dev	= regular.CV(x,y, resp.ind, crit="dev"); result_dev
 result_cls	= regular.CV(x,y, resp.ind, crit="class"); result_cls
+result_mae	= regular.CV(x,y, resp.ind, crit="mae"); result_mae
 
 
-
-
-
-######################################################
-### Utility Functions
-######################################################
-
-search_colname = function(df, name) { return(grep(name, colnames(df))) }
+# ##### Store 'marker.mat' RData for testing
+# marker.mat = rbind(result_auc$vars,result_dev$vars,result_cls$vars,result_mae$vars)
+# colnames(marker.mat) = colnames(x)
+# rownames(marker.mat) = c("reg_auc","reg_dev","reg_cls","reg_mae")
+# save(marker.mat,file="marker.mat.RData")
