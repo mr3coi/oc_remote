@@ -1,6 +1,7 @@
 
 library(MASS)
 library(ROCR)
+library(nnet)
 
 wd <- "/Users/SJC/Documents/practice/internship"
 datafile <- "ova_db.csv" 
@@ -14,7 +15,7 @@ setwd(wd)
 ##### ============================================================================================
 ##### ============================================================================================
 
-# Date-to-int conversion function 				### TODO convert to days since 1900-01-01
+# Date-to-int conversion function 				##### TODO convert to # of days since 1900-01-01
 date_conv = function(date_string) {
 	date = as.vector(sapply(strsplit(date_string,split="\\."),strtoi))
 	date = sum(date*c(10000,100,1))
@@ -27,13 +28,21 @@ search_colname = function(df, name) {
 
 # Function for cross validation
 	# ncv : cross validation number
-do.cv <- function(var, ncv) {
+do.cv <- function(var, ncv, multi=F) {
 	ret <- c()
 	for (i in 1:100) {
 		# Sample round(n/ncv) rows to exclude from ova.db.csv.sub while model generation
 		idx <- sample(1:n)[1:round(n/ncv)]
-		curmod <- glm(paste(testset, "~",paste(var,collapse="+")),
-					  data=ova.db.csv.sub[-idx,], family="binomial")
+		if (multi) {
+			ova.db.csv.sub$testset2 = relevel(as.factor(ova.db.csv.sub[,testset]),
+											  ref=unique(ova.db.csv.sub[,testset])[1])
+			#var = var[sum(is.na(ova.db.csv.sub[,var]))==0]
+			curmod = multinom(testset2 ~ paste(var,collapse="+"), data=ova.db.csv.sub[-idx,])
+		}
+		else {
+			curmod <- glm(paste(testset, "~",paste(var,collapse="+")),
+					  	data=ova.db.csv.sub[-idx,], family="binomial")
+		}
 		
 		# Generate predictions using the above model and previously-excluded rows in ova.db.csv.sub
 		curpr <- predict(curmod, ova.db.csv.sub[idx,], type="response")
@@ -117,7 +126,7 @@ for (i in 1:nrow(ova.db.csv)) {
 idx = idx[names(idx)!="Stage"]
 
 	# Additional manipulation for 'Recur_Site' column
-ova.db.csv[,84] = sapply(ova.db.csv[,84],function(v) { paste(sort(unlist(strsplit(v,split=","))),collapse="") })
+ova.db.csv[,84] = sapply(ova.db.csv[,84],function(v) {paste(sort(unlist(strsplit(v,split=","))),collapse="")})
 idx = idx[names(idx)!="Recur_Site"]
 
 	# Extract numeric values at the beginning
@@ -147,6 +156,16 @@ apply(ova.db.csv,2,function(v) class(v))
 
 # Convert 'Refractory progression during CTx' to 'Yes'
 ova.db.csv$Recurrence[ova.db.csv$Recurrence==2] <- 1
+
+
+
+
+
+
+
+
+
+
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -190,6 +209,14 @@ for (i in 1:ncol(vars)) {
 # newcols2 <- names(which((colSums(is.na(ova.db.csv[,newcols])) / nrow(ova.db.csv)) == 0))
 
 
+
+
+
+
+
+
+
+
 ##### ============================================================================================
 ##### ============================================================================================
 ##### ============ Data Analysis : Regression ==============
@@ -210,6 +237,7 @@ outcome_index = c("CR",
 				  "E", "DC", "DD", "DE",
 				  "CI", "CJ",
 				  "AX", "AY")
+
 outcome_idx = list(1,2:3,4:5,6:9,10:11,12:13)
 
 # Check availability of the above desired outcome variables
@@ -217,12 +245,12 @@ avail = outcomes[outcomes %in% colnames(ova.db.csv)]
 
 # Choose which set of response variable and explanatory variables to analyze
 set_num = 1
+var_num = 1
 testset = outcomes[outcome_idx[[set_num]]]
-testset = testset[testset %in% colnames(ova.db.csv)]
+testset = testset[testset %in% colnames(ova.db.csv)][var_num]
 
 # ova.db.csv.sub : Submatrix of ova.db.csv of rows w/ "testset" column value != NA
-# 				   and columns corresponding to post-surgery removed
-ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db.csv,"Residual_tumor_size_1st")]
+ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 
 # # Run regressions b/w the interested response variable and the explanatory variables in 'vars[,set_num]'
 # mod <- glm( paste(testset, "~", paste(exp_vars[[set_num]], collapse="+") ),
@@ -253,8 +281,19 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db
 
 <<<<<<< HEAD
 
+<<<<<<< HEAD
 =======
 >>>>>>> parent of 1a59b3a... Added files (source2)
+=======
+
+
+
+
+
+
+
+
+>>>>>>> single_var
 ##### ============================================================================================
 ##### ============================================================================================
 # =============== Evaluate (Cross-Validation) ===============
@@ -265,19 +304,38 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),1:search_colname(ova.db
 n <- nrow(ova.db.csv.sub)
 
 # Evaluate the performance of individual variables in exp_vars[[set_num]]
-rex <- matrix(nr = length(exp_vars[[set_num]]), nc = 100)
+	# Avoid all columns corresponding to post-surgery
+avoid = search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
+	# Add other pre/during-surgery columns that are obviously meaningless or irrelevant
+avoid = c(avoid, 1:3, 5)
+rex <- matrix(nr = length(colnames(ova.db.csv)[-avoid]), nc = 100)
+rownames(rex) <- colnames(ova.db.csv.sub)[-avoid]
+options(warn=1)
 
-for (i in 1:length(exp_vars[[set_num]])) {
-  ret <- do.cv(exp_vars[[set_num]][i], 3)$auc
-  rex[i,] = ret
+# For checking whether the given dependent variable is multinomial (nominal)
+multi_var = vector(mode="logical",length=length(outcomes))
+names(multi_var) = outcomes
+multi_var[3:length(multi_var)] = T
+
+for (i in 1:nrow(rex)) {
+	#print(i)
+	ret <- do.cv(colnames(ova.db.csv.sub)[-avoid][i], 3, multi=multi_var[testset])$auc
+	rex[i,] = ret
 }
-rownames(rex) <- exp_vars[[set_num]]
 
 # Discard variables w/ mean AUC <= 0.7
 req <- t(rex)[,which(colMeans(t(rex)) > 0.7)]
 
 # Rearrange rows of 'req' in decreasing order (column means)
 req <- req[,order(colMeans(req), decreasing=T)]
+
+
+
+
+
+
+
+
 
 
 ##### ============================================================================================
@@ -296,13 +354,13 @@ par(mai=xxx)
 
 # Plot the colMeans of 'req' and draw dotted gridlines into the plot
 barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
-        main="Individual variable prediction performance w/ AUC < 0.6"); box()
+        main = paste(c(testset, "\nprediction performance w/ AUC > 0.7"),collapse="") ); box()
 grid(NA, 5, lwd=2)
 
-# Plot the colMeans in another way(???)
-par(new=T)
-barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
-        main="Individual variable prediction performance w/ AUC<0.6");box();
+# # Plot the colMeans in another way(???)
+# par(new=T)
+# barplot(colMeans(req), ylim=c(0,1), xaxt='n', xpd=F, space=1, ylab="AUC", 
+#         main = paste(c(testset, "\nprediction performance w/ AUC > 0.7"),collapse="") ); box();
 
 # Add variable labels to plot
 end_point = 0.5 + ncol(req) + ncol(req) - 1 
