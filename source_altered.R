@@ -157,6 +157,16 @@ apply(ova.db.csv,2,function(v) class(v))
 # Convert 'Refractory progression during CTx' to 'Yes'
 ova.db.csv$Recurrence[ova.db.csv$Recurrence==2] <- 1
 
+
+
+
+
+
+
+
+
+
+
 ##### ============================================================================================
 ##### ============================================================================================
 ##### ============== varfile : Preprocess =============
@@ -197,6 +207,14 @@ for (i in 1:ncol(vars)) {
 
 # # newcols2 : Choose variables among newcols w/o NA
 # newcols2 <- names(which((colSums(is.na(ova.db.csv[,newcols])) / nrow(ova.db.csv)) == 0))
+
+
+
+
+
+
+
+
 
 
 ##### ============================================================================================
@@ -261,6 +279,15 @@ ova.db.csv.sub <- ova.db.csv[!is.na(ova.db.csv[testset]),]
 # mean(do.cv(var.full, 3)$auc)
 
 
+
+
+
+
+
+
+
+
+
 ##### ============================================================================================
 ##### ============================================================================================
 # =============== Evaluate (Cross-Validation) ===============
@@ -295,6 +322,14 @@ req <- t(rex)[,which(colMeans(t(rex)) > 0.7)]
 
 # Rearrange rows of 'req' in decreasing order (column means)
 req <- req[,order(colMeans(req), decreasing=T)]
+
+
+
+
+
+
+
+
 
 
 ##### ============================================================================================
