@@ -176,9 +176,9 @@ outcome_idx = list(1,2:3,4:5,6:9,10:11,12:13)
 ##### Choose which set of response variable and explanatory variables to analyze
 set_num 	= 1
 var_num 	= 1
-resp_var 	= outcomes[outcome_idx[[set_num]]]
-resp_var 	= resp_var[resp_var %in% colnames(ova.db.csv)][var_num]
-resp.ind	= which(colnames(ova.db.csv) == resp_var)
+resp.var 	= outcomes[outcome_idx[[set_num]]]
+resp.var 	= resp.var[resp.var %in% colnames(ova.db.csv)][var_num]
+resp.ind	= which(colnames(ova.db.csv) == resp.var)
 
 ##### Extract relevant sub-data.frame from given data	=>	'ova.db.csv.sub'
 	### Avoid all columns corresponding to post-surgery
@@ -187,7 +187,7 @@ avoid 		= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ov
 avoid 		= c(avoid, 1:3, 5, 43)
 avoid 		= avoid[avoid != resp.ind]		# keep response variable if included in 'avoid'
 ova.db.csv.sub = ova.db.csv[,-avoid]		# exclude all variables w/ column indices in 'avoid'
-resp.ind	= which(colnames(ova.db.csv.sub) == resp_var)	# update 'resp.ind'
+resp.ind	= which(colnames(ova.db.csv.sub) == resp.var)	# update 'resp.ind'
 
 ##### Preprocess : remove NA's	=>	'input' (final data form)
 row_NA		= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
@@ -205,7 +205,36 @@ input[,resp.ind] = as.factor(input[,resp.ind])
 ##### ============================================================================================
 
 
-
+stepwiseAIC = function(input,resp.var) {
+	##### Preprocessing	
+	
+	##### Generate model using logistic regression
+	f 	= as.formula(paste(resp.var, "~", paste(colnames(input)[colnames(input)!=resp.var], collapse="+")))
+	mod = glm(f, data = input, family = "binomial")
+	nul = glm(paste(resp.var, "~1"), data = input, family = "binomial")
+	
+	##### Conduct stepwise AIC both forwards and backwards
+	step.0	<- stepAIC(nul, scope=list(lower=nul,upper=mod), direction="both")
+	#step.0x	<- step(nul, scope=list(lower=nul,upper=mod), direction="both")
+	step.f	<- stepAIC(mod, direction="both")
+	#step.fx <- step(mod, direction="both")
+	
+	##### Show ANOVA tables from the above regressions
+	step.0$anova
+	step.f$anova
+	
+	
+	##### Picked
+	var.full <- setdiff(exp_vars[[set_num]], substr(as.character(step.f$anova$Step), 3, 1000))
+	mean(do.cv(var.full, 3)$auc)
+	var.full <- substr(as.character(step.0$anova$Step), 3, 1000)[-1]
+	mean(do.cv(var.full, 3)$auc)
+	
+	var.full <- setdiff(exp_vars[[set_num]], substr(as.character(step.fx$anova$Step), 3, 1000))
+	mean(do.cv(var.full, 3)$auc)
+	var.full <- substr(as.character(step.0x$anova$Step), 3, 1000)[-1]
+	mean(do.cv(var.full, 3)$auc)
+}
 
 
 
