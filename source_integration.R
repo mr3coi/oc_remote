@@ -13,10 +13,10 @@ library(glmnet)
 library(caret)
 library(AUC)
 
-##### Locate source data
-wd <- "/Users/SJC/Documents/practice/internship"
+##### Locate & read source data
+wd 		 <- "/Users/SJC/Documents/practice/internship"
 datafile <- "ova_db.csv" 
-varfile <- "ova_variable.csv" 
+varfile  <- "ova_variable.csv" 
 
 setwd(wd) 
 ova.db.csv = as.data.frame(read.csv(datafile,skip=2,stringsAsFactors=F,check.names=F)) 
@@ -181,7 +181,7 @@ resp.var 	= resp.var[resp.var %in% colnames(ova.db.csv)][var_num]
 resp.ind	= which(colnames(ova.db.csv) == resp.var)
 
 ##### Extract relevant sub-data.frame from given data	=>	'ova.db.csv.sub'
-	### Avoid all columns corresponding to post-surgery
+	### Avoid all columns corresponding to post-surgery (specify indices of variables to avoid here)
 avoid 		= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
 	### Add other pre/during-surgery columns that are obviously meaningless or irrelevant
 avoid 		= c(avoid, 1:3, 5, 43)
@@ -440,7 +440,7 @@ performance = function(input, resp.ind, marker.mat, k, knn.NN=3, svm.kernel='rad
 ##### ============================================================================================
 
 ##### Function call for stepwise AIC
-result_AIC	= stepwiseAIC(input,resp_var)
+result_AIC	= stepwiseAIC(input,resp.var)
 
 ##### Function call for regularized regression
 result_auc	= regular.CV(input, resp.ind, crit="auc"); 	 result_auc
