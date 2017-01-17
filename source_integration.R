@@ -21,8 +21,6 @@ varfile <- "ova_variable.csv"
 setwd(wd) 
 ova.db.csv = as.data.frame(read.csv(datafile,skip=2,stringsAsFactors=F,check.names=F)) 
 
-##### Stop from converting warnings to errors
-options(warn=1)
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -30,16 +28,15 @@ options(warn=1)
 ##### ============================================================================================
 ##### ============================================================================================
 
-# Date-to-int conversion function 				##### TODO convert to # of days since 1900-01-01
+##### Date-to-int conversion function 				##### TODO convert to # of days since 1900-01-01
 date_conv = function(date_string) {
 	date = as.vector(sapply(strsplit(date_string,split="\\."),strtoi))
 	date = sum(date*c(10000,100,1))
 	return(date)
 }
 
+##### Returns the column index in 'df' of the variable w/ specified 'name'
 search_colname = function(df, name) { return(grep(name, colnames(df))) }
-
-
 
 
 ##### ============================================================================================
@@ -48,7 +45,7 @@ search_colname = function(df, name) { return(grep(name, colnames(df))) }
 ##### ============================================================================================
 ##### ============================================================================================
 
-# Change 'unknown' values to NA
+##### Change 'unknown' values to NA
 NAval <- sapply(strsplit(colnames(ova.db.csv),"\\n"), 
                 function(v) { q  <- trimws(v[-1])           # Generate character vector of items in colnames
                                                             # w/ whitespaces removed
@@ -60,32 +57,32 @@ for (i in 1:ncol(ova.db.csv)) {
   }
 }
 
-# Specific deletions (flaws)
-	# Delete unnamed columns
+##### Specific deletions (flaws)
+	### Delete unnamed columns
 idx = which(colnames(ova.db.csv)=="")
-	# Remove last two rows (empty rows)
+	### Remove last two rows (empty rows)
 ova.db.csv = ova.db.csv[ 1:236, -idx ]
-	# Delete the repeated patient number column
+	### Delete the repeated patient number column
 ova.db.csv = ova.db.csv[,-which(colnames(ova.db.csv)=="Pt_No.1")]
 
-# Alter column names to main titles (removing choices) and remove spaces within the main titles
+##### Alter column names to main titles (removing choices) and remove spaces within the main titles
 colnames(ova.db.csv) = gsub(" ", "_", sapply(strsplit(colnames(ova.db.csv),"\\n"),function(v)trimws(v[1]))) 
 
-# Find indices of columns w/ (almost) uniform values and remove such columns				### TODO almost
+##### Find indices of columns w/ (almost) uniform values and remove such columns				### TODO almost
 idx <- which( apply(ova.db.csv, 2, function(v) length(table(v)) == 1) )
 ova.db.csv <- ova.db.csv[,-idx] 
 
-# Find and remove columns w/ NA/total ratio > 0.2
+##### Find and remove columns w/ NA/total ratio > 0.2
 idx <- which(apply(ova.db.csv, 2, function(v) sum(is.na(v)))/nrow(ova.db.csv) > 0.2)
 ova.db.csv <- ova.db.csv[,-idx]
-options(warn=2);
+options(warn=2);	# to exploit errors
 
-# Find and remove/modify columns w/ non-numeric data
-	#idx : non-numeric indices
+##### Find and remove/modify columns w/ non-numeric data
+	### idx : non-numeric indices
 idx <- which(apply(ova.db.csv, 2, function(v) class(try(as.numeric(v), T))=='try-error'))
 options(warn=1);
 
-	# Convert date info into numeric data (YYYYMMDD)
+	##### Convert date info into numeric data (YYYYMMDD)
 pattern = "\\d+\\.\\d+\\.\\d+"
 idx2 = c()
 
@@ -97,7 +94,7 @@ for (col in idx) {
 }
 idx = idx[!idx %in% idx2]
 
-	# Additional manipulation for 'Stage' column
+	##### Additional manipulation for 'Stage' column
 ref = c(rep(1,3),rep(2,3),rep(3,3),4)
 names(ref) = c("1a","1b","1c","2a","2b","2c","3a","3b","3c","4")
 for (i in 1:nrow(ova.db.csv)) {
@@ -105,11 +102,11 @@ for (i in 1:nrow(ova.db.csv)) {
 }
 idx = idx[names(idx)!="Stage"]
 
-	# Additional manipulation for 'Recur_Site' column
+	##### Additional manipulation for 'Recur_Site' column
 ova.db.csv[,84] = sapply(ova.db.csv[,84],function(v) {paste(sort(unlist(strsplit(v,split=","))),collapse="")})
 idx = idx[names(idx)!="Recur_Site"]
 
-	# Extract numeric values at the beginning
+	##### Extract numeric values at the beginning
 pattern = "(\\d).*"
 idx2 = c()
 for (col in idx) {
@@ -120,34 +117,24 @@ for (col in idx) {
 }
 idx = idx[!idx %in% idx2]
 
-	# Delete the remaining non-numeric columns
+	### Delete the remaining non-numeric columns
 ova.db.csv <- ova.db.csv[,-idx]
 
-# Convert character values in ova.db.csv into numeric values
+##### Convert character values in ova.db.csv into numeric values
 ova.db.csv <- as.data.frame(apply(ova.db.csv, 2, as.numeric))
 
-# Find and remove columns w/ NA/total ratio > 0.2
+##### Find and remove columns w/ NA/total ratio > 0.2
 idx <- which(apply(ova.db.csv, 2, function(v) sum(is.na(v)))/nrow(ova.db.csv) > 0.2)
 ova.db.csv <- ova.db.csv[,-idx]
-options(warn=2)
+# options(warn=2)
 
-# Check preprocessing results
+##### Check preprocessing results
 apply(ova.db.csv,2,function(v) class(v))
 
-# Convert 'Refractory progression during CTx' to 'Yes'
+##### Convert 'Refractory progression during CTx' to 'Yes'
 ova.db.csv$Recurrence[ova.db.csv$Recurrence==2] <- 1
 
 
-
-
-
-
-
-
-
-
-
-##### ============================================================================================
 ##### ============================================================================================
 ##### ============== varfile : Preprocess =============
 ##### ============================================================================================
@@ -162,13 +149,6 @@ vars <- apply(ova.var.csv[seq(2,18,4),], 1, function(v)sapply(strsplit(v,"\\n"),
                )[-1,] 
 rownames(vars) <- NULL
 colnames(vars) = c("Recurrence","Platinum_resistance","PFS","OS","Op. Debulking")
-
-
-
-
-
-
-
 
 
 ##### ============================================================================================
@@ -206,15 +186,15 @@ avoid 		= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ov
 	### Add other pre/during-surgery columns that are obviously meaningless or irrelevant
 avoid 		= c(avoid, 1:3, 5, 43)
 avoid 		= avoid[avoid != resp.ind]		# keep response variable if included in 'avoid'
-ova.db.csv.sub = ova.db.csv[,-avoid]	# exclude all variables w/ column indices in 'avoid'
+ova.db.csv.sub = ova.db.csv[,-avoid]		# exclude all variables w/ column indices in 'avoid'
 resp.ind	= which(colnames(ova.db.csv.sub) == resp_var)	# update 'resp.ind'
 
 ##### Preprocess : remove NA's	=>	'input' (final data form)
 row_NA		= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
 input 		= ova.db.csv.sub[row_NA,]
 
-
-
+##### Convert the column for response variable into a factor
+input[,resp.ind] = as.factor(input[,resp.ind])
 
 
 
@@ -439,7 +419,6 @@ result_mae	= regular.CV(input, resp.ind, crit="mae"); result_mae
 marker.mat 			 = rbind(result_auc$vars,result_dev$vars,result_cls$vars,result_mae$vars)
 colnames(marker.mat) = colnames(input[,-resp.ind])
 rownames(marker.mat) = c("reg_auc","reg_dev","reg_cls","reg_mae")
-marker.mat
 
 ##### Run comparison
 eval.result = performance(input, resp.ind, marker.mat, k=5); eval.result
