@@ -196,15 +196,16 @@ resp.ind	= which(colnames(ova.db.csv) == resp_var)
 
 ##### Extract relevant sub-data.frame from given data	=>	'ova.db.csv.sub'
 	### Avoid all columns corresponding to post-surgery
-avoid 	= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
+avoid 		= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
 	### Add other pre/during-surgery columns that are obviously meaningless or irrelevant
-avoid 	= c(avoid, 1:3, 5, 43)
-avoid 	= avoid[avoid != resp.ind]		# keep response variable if included in 'avoid'
+avoid 		= c(avoid, 1:3, 5, 43)
+avoid 		= avoid[avoid != resp.ind]		# keep response variable if included in 'avoid'
 ova.db.csv.sub = ova.db.csv[,-avoid]	# exclude all variables w/ column indices in 'avoid'
+resp.ind	= which(colnames(ova.db.csv.sub) == resp_var)	# update 'resp.ind'
 
 ##### Preprocess : remove NA's	=>	'input'
-row_NA	= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
-input 	= ova.db.csv.sub[row_NA]
+row_NA		= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
+input 		= ova.db.csv.sub[row_NA,]
 
 
 
@@ -240,10 +241,10 @@ input 	= ova.db.csv.sub[row_NA]
 # crit		: criterion for finding the best choice of 'lambda'
 regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="deviance") {
 	##### Partitioning
-	input.x	= input[,-resp.ind]
-	input.y	= input[,resp.ind]
+	input.x	= as.matrix(input[,-resp.ind])
+	input.y	= as.matrix(input[,resp.ind])
 	
-	inTrain	= createDataPartition(y,p=0.7,list=F)
+	inTrain	= createDataPartition(input.y,p=0.7,list=F)
 	x.train	= input.x[inTrain,]
 	y.train	= input.y[inTrain,]
 	x.test	= input.x[-inTrain,]
@@ -259,18 +260,21 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 	
 	##### Variable selection based on regularized regression
 	l 		= model$lambda.min
-	var.ind	= rep(0,ncol(x))
+	var.ind	= rep(0,ncol(input.x))
 	var.ind[unlist(predict(model, newx=x.test, type="nonzero", s=l))] = 1
 	coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
 	
 	return(list(lambda=l, vars=var.ind, coeffs=coeffs))
 }
 
-# ##### Function call
-# result_auc	= regular.CV(x,y, resp.ind, crit="auc"); result_auc
-# result_dev	= regular.CV(x,y, resp.ind, crit="dev"); result_dev
-# result_cls	= regular.CV(x,y, resp.ind, crit="class"); result_cls
-# result_mae	= regular.CV(x,y, resp.ind, crit="mae"); result_mae
+
+##### ============================================================================================
+##### ============================================================================================
+##### ============== Performance evaluation : RF, kNN, SVM, Logistic Reg. ===============
+##### ============================================================================================
+##### ============================================================================================
+
+
 
 
 ##### ============================================================================================
@@ -280,4 +284,8 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 ##### ============================================================================================
 
 
-
+# ##### Function call for regularized regression
+result_auc	= regular.CV(input, resp.ind, crit="auc"); result_auc
+result_dev	= regular.CV(input, resp.ind, crit="dev"); result_dev
+result_cls	= regular.CV(input, resp.ind, crit="class"); result_cls
+result_mae	= regular.CV(input, resp.ind, crit="mae"); result_mae
