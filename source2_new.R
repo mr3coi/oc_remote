@@ -15,6 +15,8 @@ load("ova.db.csv.RData")	# temporary source for 'ova.db.csv'
 load("marker.mat.RData")	# temporary source for 'marker.mat'
 
 
+##### Stop from converting warnings to errors
+options(warn=1)
 
 
 ######################################################
