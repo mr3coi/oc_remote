@@ -335,10 +335,6 @@ ova.db.csv = ova.db.csv[ 1:236, -idx ]
 	### Delete the repeated patient number column
 ova.db.csv = ova.db.csv[,-which(colnames(ova.db.csv)=="Pt_No.1")]
 
-##### Find indices of columns w/ (almost) uniform values and remove such columns
-idx <- which( apply(ova.db.csv, 2, function(v) { any(table(v)/length(v) > 0.99) }) )
-ova.db.csv <- ova.db.csv[,-idx] 
-
 ##### Find and remove columns w/ NA/total ratio > 0.2
 idx <- which(apply(ova.db.csv, 2, function(v) sum(is.na(v)))/nrow(ova.db.csv) > 0.2)
 ova.db.csv <- ova.db.csv[,-idx]
@@ -399,6 +395,10 @@ ova.db.csv <- ova.db.csv[,-idx]
 recurrence.ind = extract_ind(ova.db.csv,"Recurrence")
 ova.db.csv[,recurrence.ind][ova.db.csv[,recurrence.ind]==2] <- 1
 
+##### Find indices of columns w/ (almost : 95%) uniform values and remove such columns
+idx <- which( apply(ova.db.csv, 2, function(v) { any(table(v)/length(v) > 0.95) }) )
+ova.db.csv <- ova.db.csv[,-idx] 
+
 
 # lv_data = unlist(lapply(strsplit(colnames(ova.db.csv),split="\n"), length))
 # lv_count = unlist(lapply(ova.db.csv, function(v) length(unique(v)))) + 1
@@ -412,7 +412,7 @@ factor_check 		= sapply(strsplit(colnames(ova.db.csv),split="\n"),
 names(factor_check) = gsub(" ","_",sapply(strsplit(colnames(ova.db.csv),"\\n"), function(v) trimws(v[1])))
 	### Add to 'factor_check' the variables that are categorical but not filtered
 manual_add			= c("Parity","Other_site")		# names of variables to add
-factor_check[manual_add] = 1
+factor_check[manual_add[manual_add %in% colnames(ova.db.csv)]] = 1
 
 	### Convert the prespecified columns to factors
 for (i in 1:ncol(ova.db.csv)) { if (factor_check[i]==1) ova.db.csv[,i] = as.factor(ova.db.csv[,i]) }
@@ -424,6 +424,7 @@ colnames(ova.db.csv) = names(factor_check)
 str(ova.db.csv)
 
 
+# ##### ============================================================================================
 # ##### ============================================================================================
 # ##### ============== varfile : Preprocess =============
 # ##### ============================================================================================
@@ -482,9 +483,6 @@ resp.ind	= which(colnames(ova.db.csv.sub) == resp.var)	# update 'resp.ind'
 row_NA		= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
 input 		= ova.db.csv.sub[row_NA,]
 
-##### Convert the column for response variable into a factor
-input[,resp.ind] = as.factor(input[,resp.ind])
-
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -527,14 +525,12 @@ for (var1.ind in 1:(length(exp.vars)-1)) {
 			f 		= as.formula(paste(categ, numer, sep="~"))
 			cat("cat : '", categ, "', num : '", numer, "', lv : ", lv, '\n')
 			
-			if (lv == 1) {	 # Uniform column => pass
-				p.value = NaN
-			}
-			else if (lv == 2) { 		# Binomial Logistic Regression (assuming normality)
-				model 	= glm(f,data=input)
+			if (lv == 1) { p.value = NaN }	# Uniform column => pass
+			else if (lv == 2) { 			# Binomial Logistic Regression (assuming normality)
+				model 	= glm(f,data=input,family=binomial(link=logit))
 				p.value	= as.data.frame(anova(model))[1,5]
 			}
-			else {		# Multinomial Logistic Regression
+			else {							# Multinomial Logistic Regression
 				input$relv	= relevel(input[,categ], ref=levels(input[,categ])[1])
 				f 			= as.formula(paste("relv", numer, sep="~"))
 				model 	  	= multinom(f, data=input)
@@ -547,6 +543,10 @@ for (var1.ind in 1:(length(exp.vars)-1)) {
 		}
 	}
 }
+	### tidy-up (restoration to original state)
+input = input[,-length(colnames(input))]
+options(warn=1)
+
 	### Remove defected variables (var.s causing NaN p-values)
 if (any(is.nan(corr_pairs[,"p.value"]))) {
 	NaN_tbl = table(corr_pairs[which(is.nan(corr_pairs[,"p.value"])),-3])
@@ -554,7 +554,17 @@ if (any(is.nan(corr_pairs[,"p.value"]))) {
 	idx		= as.numeric(names(ranking)[which(ranking == ranking[1])])
 	corr_pairs = corr_pairs[!(corr_pairs[,1] %in% idx | corr_pairs[,2] %in% idx),]
 }
+
+	### Extract all pairs w/ p-value < threshold(alpha)
+	###		and sort by p-value in increasing order
+alpha 		= 0.005
+corr_pairs 	= corr_pairs[corr_pairs[,3] < alpha,]
 corr_pairs 	= corr_pairs[order(corr_pairs[,3]),]
+
+
+
+
+
 
 ##### Function call for stepwise AIC
 result_AIC	= stepwiseAIC(input,resp.var)
