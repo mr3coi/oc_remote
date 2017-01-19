@@ -51,7 +51,7 @@ stepwiseAIC = function(input,resp.var) {
 	exp.vars = colnames(input)[colnames(input)!=resp.var]
 	
 	##### Generate model using logistic regression
-	f 	= as.formula(paste(resp.var, "~", paste(exp.vars, collapse="+")))
+	f 	= as.formula(paste(resp.var, "~", paste(exp.vars, collapse=" + ")))
 	mod = glm(f, data = input, family = "binomial")
 	nul = glm(paste(resp.var, "~1"), data = input, family = "binomial")
 	
@@ -335,8 +335,8 @@ ova.db.csv = ova.db.csv[ 1:236, -idx ]
 	### Delete the repeated patient number column
 ova.db.csv = ova.db.csv[,-which(colnames(ova.db.csv)=="Pt_No.1")]
 
-##### Find indices of columns w/ (almost) uniform values and remove such columns				### TODO almost
-idx <- which( apply(ova.db.csv, 2, function(v) length(table(v)) == 1) )
+##### Find indices of columns w/ (almost) uniform values and remove such columns
+idx <- which( apply(ova.db.csv, 2, function(v) { any(table(v)/length(v) > 0.99) }) )
 ova.db.csv <- ova.db.csv[,-idx] 
 
 ##### Find and remove columns w/ NA/total ratio > 0.2
@@ -409,8 +409,7 @@ ova.db.csv[,recurrence.ind][ova.db.csv[,recurrence.ind]==2] <- 1
 ##### Classify b/w categorical and numerical variables
 factor_check 		= sapply(strsplit(colnames(ova.db.csv),split="\n"), 
 							 function(v) ifelse(length(v) > 1,1,0))
-names(factor_check) = sapply(strsplit(colnames(ova.db.csv),split="\n"),
-							 function(v) return(v[1]))
+names(factor_check) = gsub(" ","_",sapply(strsplit(colnames(ova.db.csv),"\\n"), function(v) trimws(v[1])))
 	### Add to 'factor_check' the variables that are categorical but not filtered
 manual_add			= c("Parity","Other_site")		# names of variables to add
 factor_check[manual_add] = 1
@@ -419,7 +418,7 @@ factor_check[manual_add] = 1
 for (i in 1:ncol(ova.db.csv)) { if (factor_check[i]==1) ova.db.csv[,i] = as.factor(ova.db.csv[,i]) }
 
 ##### Choose main titles as column names (removing choices) and remove spaces within the main titles
-colnames(ova.db.csv) = sapply(strsplit(colnames(ova.db.csv),"\\n"), function(v) trimws(v[1]))
+colnames(ova.db.csv) = names(factor_check)
 
 ##### Check preprocessing results
 str(ova.db.csv)
@@ -492,6 +491,70 @@ input[,resp.ind] = as.factor(input[,resp.ind])
 ##### ============== Main Program ==================
 ##### ============================================================================================
 ##### ============================================================================================
+
+##### Test for and remove collinear variables
+corr_pairs = matrix(nc=3,nr=0)
+colnames(corr_pairs) = c("var1","var2","p.value")
+exp.vars = colnames(input)[colnames(input)!=resp.var]
+options(warn=0)
+require(car)
+
+for (var1.ind in 1:(length(exp.vars)-1)) {
+	var1 = exp.vars[var1.ind]
+	
+	for (var2.ind in (var1.ind+1):length(exp.vars)) {
+		var2 = exp.vars[var2.ind]
+
+		### b/w categorical variables	=> Chi-sq. independence test
+		if (prod(factor_check[c(var1,var2)]) == 1) {
+		# 	tbl = table(input[,var1],input[,var2])
+		# 	corr_pairs = rbind(corr_pairs, c(var1.ind,var2.ind, chisq.test(tbl)$p.value))
+		}
+		### b/w numerical variables		=> Linear regression independence test
+		else if (sum(factor_check[c(var1,var2)]) == 0) {
+		# 	#cat(var1,var2,'\n')
+		# 	f 		= as.formula(paste(var1,var2,sep="~"))
+		# 	model 	= lm(f,data=input)
+		# 	p.value	= as.data.frame(anova(model))[1,5]
+		# 	corr_pairs = rbind(corr_pairs, c(var1.ind,var2.ind, p.value))
+		}
+		### b/w a numerical variable and a categorical variable
+		###		=> Logistic regression independence test
+		else {
+			categ = ifelse(factor_check[var1]==1, var1, var2)
+			numer = ifelse(factor_check[var1]==1, var2, var1)
+			lv	  = length(unique(input[,categ]))
+			f 		= as.formula(paste(categ, numer, sep="~"))
+			cat("cat : '", categ, "', num : '", numer, "', lv : ", lv, '\n')
+			
+			if (lv == 1) {	 # Uniform column => pass
+				p.value = NaN
+			}
+			else if (lv == 2) { 		# Binomial Logistic Regression (assuming normality)
+				model 	= glm(f,data=input)
+				p.value	= as.data.frame(anova(model))[1,5]
+			}
+			else {		# Multinomial Logistic Regression
+				input$relv	= relevel(input[,categ], ref=levels(input[,categ])[1])
+				f 			= as.formula(paste("relv", numer, sep="~"))
+				model 	  	= multinom(f, data=input)
+				## Use Wald Z-test under assumption of normality
+				# wald_z		= summary(model)$coefficients / summary(model)$standard.errors
+				# p.value 	= (1 - pnorm(abs(wald_z),0,1)) * 2	# Both ends
+				p.value 	= unlist(Anova(model))[3]
+			}
+			corr_pairs = rbind(corr_pairs, c(var1.ind,var2.ind, p.value))
+		}
+	}
+}
+	### Remove defected variables (var.s causing NaN p-values)
+if (any(is.nan(corr_pairs[,"p.value"]))) {
+	NaN_tbl = table(corr_pairs[which(is.nan(corr_pairs[,"p.value"])),-3])
+	ranking = sort(rank(NaN_tbl,ties.method="min"),decreasing=T)
+	idx		= as.numeric(names(ranking)[which(ranking == ranking[1])])
+	corr_pairs = corr_pairs[!(corr_pairs[,1] %in% idx | corr_pairs[,2] %in% idx),]
+}
+corr_pairs 	= corr_pairs[order(corr_pairs[,3]),]
 
 ##### Function call for stepwise AIC
 result_AIC	= stepwiseAIC(input,resp.var)
