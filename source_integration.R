@@ -103,8 +103,8 @@ stepwiseAIC = function(input,resp.var) {
 # crit		: criterion for finding the best choice of 'lambda'
 regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="deviance") {
 	##### Partitioning
-	input.x	= as.matrix(input[,-resp.ind])
-	input.y	= as.matrix(input[,resp.ind])
+	input.x	= data.matrix(input[,-resp.ind])
+	input.y	= data.matrix(input[,resp.ind])
 	
 	inTrain	= createDataPartition(input.y,p=0.7,list=F)
 	x.train	= input.x[inTrain,]
@@ -114,8 +114,7 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 	
 	##### Model generation
 	model	= cv.glmnet(x.train, y.train, alpha=ifelse(LASSO,1,0),
-					  family="binomial", nfolds=k, nlambda=50,
-					  type.measure=crit)
+					  family="binomial", nfolds=k, nlambda=50, type.measure=crit)
 	
 	##### Plot the generated model
 	#plot(model,xvar="lambda",label=T)
@@ -143,9 +142,9 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 
 ##### Wrapper for RF algorithm
 # train.dat : dataset for train.dat the machine
-# test.dat	   : dataset for test.dat the machine
-# resp.ind : index of the response variable in 'train.dat' and 'test.dat' datasets
-# marker   : vector indicating which columns to use (1) and not to use (0) as
+# test.dat	: dataset for test.dat the machine
+# resp.ind	: index of the response variable in 'train.dat' and 'test.dat' datasets
+# marker  	: vector indicating which columns to use (1) and not to use (0) as
 #				explanatory variables in 'train.dat' and 'test.dat' datasets
 doRF = function(train.dat, test.dat, resp.ind, marker) {
 	require(caret)
@@ -195,7 +194,6 @@ doKNN = function(train.dat, test.dat, resp.ind, marker, NN) {
 #  	pred 	= knn(train.dat[,-5],test.dat[,-5],train.dat[,5],k=NN,prob=T)
 
  	AUC 	= AUC::auc( roc(pred, as.factor(test.dat[,resp])) )
- 	
  	return(AUC)
 }
 
@@ -402,13 +400,6 @@ ova.db.csv[,recurrence.ind][ova.db.csv[,recurrence.ind]==2] <- 1
 idx <- which( apply(ova.db.csv, 2, function(v) { any(table(v)/length(v) > 0.95) }) )
 ova.db.csv <- ova.db.csv[,-idx] 
 
-
-# lv_data = unlist(lapply(strsplit(colnames(ova.db.csv),split="\n"), length))
-# lv_count = unlist(lapply(ova.db.csv, function(v) length(unique(v)))) + 1
-# names(lv_count) = NULL
-# lv_data - lv_count
-
-
 ##### Classify b/w categorical and numerical variables
 factor_check 		= sapply(strsplit(colnames(ova.db.csv),split="\n"), 
 							 function(v) ifelse(length(v) > 1,1,0))
@@ -425,6 +416,23 @@ colnames(ova.db.csv) = names(factor_check)
 
 ##### Check preprocessing results
 str(ova.db.csv)
+
+##### Check flawed values in remaining columns
+# lv_data = unlist(lapply(strsplit(colnames(ova.db.csv),split="\n"), length)) - 1
+# lv_count = unlist(lapply(ova.db.csv, function(v) length(unique(v[!is.na(v)])))) 
+# names(lv_count) = NULL
+# lv_count[factor_check==0] = 0
+# 
+# names(factor_check)[which(lv_data - lv_count < 0)]
+# (lv_data - lv_count)[which(lv_data - lv_count < 0)]
+
+# Menopausal_state : 2
+# Marital_state : 0
+# Educational_state : 0
+# Occupational_state : 2
+# Omentectomy : 2
+# 1st_Regimen : 0
+# Death : 4
 
 
 # ##### ============================================================================================
@@ -488,7 +496,7 @@ input 		= ova.db.csv.sub[row_NA,]
 
 ##### temporary storage of 'input' for easier reload
 #save(input,file='input.RData')
-load(file='input.RData')
+#load(file='input.RData')
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -563,7 +571,7 @@ if (any(is.nan(corr.pairs[,"p.value"]))) {
 
 	### temporary storage of 'corr.pairs'(full) for easier reload
 #save(corr.pairs,file='corr.pairs.RData')
-load(file='corr.pairs.RData')
+#load(file='corr.pairs.RData')
 
 	### Plot # of pairs against thresholds for p-value to find optimum threshold
 alpha_seq	= c(1 %o% 10^(-3:-15))
@@ -611,8 +619,8 @@ ggnet2(net_obj,size=5,label=T)
 length(include); include
 
 	### Update 'input' to only contain the surviving explanatory variables (in 'include')
-input = input[,c(include,resp.ind)]; head(input)
-
+input 	 = input[,c(include,resp.ind)]; head(input)
+resp.ind = which(colnames(input) == resp.var)
 
 
 
