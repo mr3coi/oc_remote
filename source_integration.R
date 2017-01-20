@@ -13,6 +13,9 @@ library(glmnet)
 library(caret)
 library(AUC)
 
+#require(devtools); devtools::install_github("briatte/ggnet")
+library(ggnet); library(network); library(sna)
+
 wd 		 <- "/Users/SJC/Documents/practice/internship"
 datafile <- "ova_db.csv" 
 varfile  <- "ova_variable.csv" 
@@ -483,6 +486,9 @@ resp.ind	= which(colnames(ova.db.csv.sub) == resp.var)	# update 'resp.ind'
 row_NA		= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
 input 		= ova.db.csv.sub[row_NA,]
 
+##### temporary storage of 'input' for easier reload
+#save(input,file='input.RData')
+load(file='input.RData')
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -491,8 +497,8 @@ input 		= ova.db.csv.sub[row_NA,]
 ##### ============================================================================================
 
 ##### Test for and remove collinear variables
-corr_pairs = matrix(nc=3,nr=0)
-colnames(corr_pairs) = c("var1","var2","p.value")
+corr.pairs = matrix(nc=3,nr=0)
+colnames(corr.pairs) = c("var1","var2","p.value")
 exp.vars = colnames(input)[colnames(input)!=resp.var]
 options(warn=0)
 require(car)
@@ -505,16 +511,16 @@ for (var1.ind in 1:(length(exp.vars)-1)) {
 
 		### b/w categorical variables	=> Chi-sq. independence test
 		if (prod(factor_check[c(var1,var2)]) == 1) {
-		# 	tbl = table(input[,var1],input[,var2])
-		# 	corr_pairs = rbind(corr_pairs, c(var1.ind,var2.ind, chisq.test(tbl)$p.value))
+			tbl = table(input[,var1],input[,var2])
+			corr.pairs = rbind(corr.pairs, c(var1.ind,var2.ind, chisq.test(tbl)$p.value))
 		}
 		### b/w numerical variables		=> Linear regression independence test
 		else if (sum(factor_check[c(var1,var2)]) == 0) {
-		# 	#cat(var1,var2,'\n')
-		# 	f 		= as.formula(paste(var1,var2,sep="~"))
-		# 	model 	= lm(f,data=input)
-		# 	p.value	= as.data.frame(anova(model))[1,5]
-		# 	corr_pairs = rbind(corr_pairs, c(var1.ind,var2.ind, p.value))
+			#cat(var1,var2,'\n')
+			f 		= as.formula(paste(var1,var2,sep="~"))
+			model 	= lm(f,data=input)
+			p.value	= as.data.frame(anova(model))[1,5]
+			corr.pairs = rbind(corr.pairs, c(var1.ind,var2.ind, p.value))
 		}
 		### b/w a numerical variable and a categorical variable
 		###		=> Logistic regression independence test
@@ -539,7 +545,7 @@ for (var1.ind in 1:(length(exp.vars)-1)) {
 				# p.value 	= (1 - pnorm(abs(wald_z),0,1)) * 2	# Both ends
 				p.value 	= unlist(Anova(model))[3]
 			}
-			corr_pairs = rbind(corr_pairs, c(var1.ind,var2.ind, p.value))
+			corr.pairs = rbind(corr.pairs, c(var1.ind,var2.ind, p.value))
 		}
 	}
 }
@@ -548,19 +554,64 @@ input = input[,-length(colnames(input))]
 options(warn=1)
 
 	### Remove defected variables (var.s causing NaN p-values)
-if (any(is.nan(corr_pairs[,"p.value"]))) {
-	NaN_tbl = table(corr_pairs[which(is.nan(corr_pairs[,"p.value"])),-3])
+if (any(is.nan(corr.pairs[,"p.value"]))) {
+	NaN_tbl = table(corr.pairs[which(is.nan(corr.pairs[,"p.value"])),-3])
 	ranking = sort(rank(NaN_tbl,ties.method="min"),decreasing=T)
 	idx		= as.numeric(names(ranking)[which(ranking == ranking[1])])
-	corr_pairs = corr_pairs[!(corr_pairs[,1] %in% idx | corr_pairs[,2] %in% idx),]
+	corr.pairs = corr.pairs[!(corr.pairs[,1] %in% idx | corr.pairs[,2] %in% idx),]
 }
 
-	### Extract all pairs w/ p-value < threshold(alpha)
-	###		and sort by p-value in increasing order
-alpha 		= 0.005
-corr_pairs 	= corr_pairs[corr_pairs[,3] < alpha,]
-corr_pairs 	= corr_pairs[order(corr_pairs[,3]),]
+	### temporary storage of 'corr.pairs'(full) for easier reload
+#save(corr.pairs,file='corr.pairs.RData')
+load(file='corr.pairs.RData')
 
+	### Plot # of pairs against thresholds for p-value to find optimum threshold
+alpha_seq	= c(1 %o% 10^(-3:-15))
+pair_count	= sapply(alpha_seq, function(v) { nrow(corr.pairs[corr.pairs[,3] < v,]) })
+plot(-log10(alpha_seq),pair_count)
+
+	### Extract all pairs w/ p-value < threshold(alpha)	and sort by p-value in increasing order
+alpha 		= 1e-5
+corr.edit 	= corr.pairs[corr.pairs[,3] < alpha,]
+corr.edit 	= corr.edit[order(corr.edit[,3]),]
+
+	### Check names of and plot variable pairs to check whether they are truly correlated
+# var1.ind = 21
+# var2.ind = 22
+# exp.vars[c(var1.ind,var2.ind)]
+# plot(input[,exp.vars[var1.ind]],input[,exp.vars[var2.ind]])
+
+	### Plot a network graph for visualization of key variables
+nodes	= sort(unique(as.numeric(corr.edit[,-3])))
+#plot(table(as.numeric(corr.edit[,-3])))
+net 	= matrix(0,nc=length(nodes),nr=length(nodes),dimnames=list(nodes,nodes))
+for (i in 1:nrow(net)) {
+	for (j in (i+1):ncol(net)) {
+		if( any((corr.edit[,1] %in% nodes[i] & corr.edit[,2] %in% nodes[j]) |
+			(corr.edit[,1] %in% nodes[j] & corr.edit[,2] %in% nodes[i])) ) net[i,j] = net[j,i] = 1
+	}
+}
+
+	### Remove most highly linked nodes until each node is isolated
+exclude_node_val = c()
+
+while(T) {
+	include = (1:length(nodes))[!(1:length(nodes)) %in% match(as.character(exclude_node_val),nodes)]
+	net_obj = network(net[include,include],directed=F)
+	network.vertex.names(net_obj) = nodes[include]
+	ggnet2(net_obj,size=5,label=T)
+	row.sum = apply(net[include,include],1,sum)
+	if (all(row.sum == 0)) break
+	most_link_node = as.numeric(names(row.sum)[which.max(row.sum)])
+	exclude_node_val = c(exclude_node_val,most_link_node)
+}
+
+	### Check final (isolated) state of variables
+ggnet2(net_obj,size=5,label=T)
+length(include); include
+
+	### Update 'input' to only contain the surviving explanatory variables (in 'include')
+input = input[,c(include,resp.ind)]; head(input)
 
 
 
