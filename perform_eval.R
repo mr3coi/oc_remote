@@ -119,13 +119,14 @@ performance = function(input, resp.ind, marker.mat, k, knn.NN=3, svm.kernel='rad
 	 	res.all = matrix(nrow=nrow(marker.mat), ncol=length(algs))
 	 	colnames(res.all) = cname
 	 	rownames(res.all) = apply(marker.mat, 1, function(mm) {paste(which(mm==1), collapse = ',')})
+	 	rownames(res.all) = paste0(rownames(marker.mat),'_',rownames(res.all))
 	 	
 	 	### Call each function to compute AUC's
 	 	for( j in 1:nrow(marker.mat) ) {
-	 		# Console progress indicator
-	 		# cat('/ marker set', j, ' / ', nrow(marker.mat), ' total /')
+	 		### Console progress indicator
+	 		cat('/ marker set', j, ' / ', nrow(marker.mat), ' total /\n')
 	 		
-	 		# Generate AUC values using the above submatrices and store in 'res.all'
+	 		### Generate AUC values using the above submatrices and store in 'res.all'
 	 		tmp.rf		<- doRF(train.dat, test.dat, resp.ind, marker.mat[j,])
 	 		tmp.svm 	<- doSVM(train.dat, test.dat, resp.ind, marker.mat[j,], kernel=svm.kernel)
 	 		tmp.knn 	<- doKNN(train.dat, test.dat, resp.ind, marker.mat[j,], NN=knn.NN)

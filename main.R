@@ -86,10 +86,13 @@ input 		= ova.db.csv.sub[row_NA,]
 ##### ============================================================================================
 ##### ============================================================================================
 
+exp.vars = colnames(input)[colnames(input)!=resp.var]	## potential explanatory variables in 'input'
+factor_check = unlist(lapply(input,is.factor))			## boolean for factor variables in 'input'
+
 ##### Test for and remove collinear variables
 corr.pairs = matrix(nc=3,nr=0)
 colnames(corr.pairs) = c("var1","var2","p.value")
-exp.vars = colnames(input)[colnames(input)!=resp.var]
+	
 options(warn=0)
 require(car)
 
@@ -97,7 +100,7 @@ for (var1.ind in 1:(length(exp.vars)-1)) {
 	var1 = exp.vars[var1.ind]
 	
 	for (var2.ind in (var1.ind+1):length(exp.vars)) {
-		var2 = exp.vars[var2.ind]
+		var2 		 = exp.vars[var2.ind]
 
 		### b/w categorical variables	=> Chi-sq. independence test
 		if (prod(factor_check[c(var1,var2)]) == 1) {
@@ -179,8 +182,8 @@ corr.edit 	= corr.edit[order(corr.edit[,3]),]
 # plot(input[,exp.vars[var1.ind]],input[,exp.vars[var2.ind]])
 
 	### Plot a network graph for visualization of key variables
-nodes	= sort(unique(as.numeric(corr.edit[,-3])))
-#plot(table(as.numeric(corr.edit[,-3])))
+	### 	& Remove most highly linked nodes until each node is isolated
+nodes	= sort(unique(as.numeric(corr.edit[,-3])))		# Column indices of vars in 'input'
 net 	= matrix(0,nc=length(nodes),nr=length(nodes),dimnames=list(nodes,nodes))
 for (i in 1:nrow(net)) {
 	for (j in (i+1):ncol(net)) {
@@ -189,27 +192,32 @@ for (i in 1:nrow(net)) {
 	}
 }
 
-	### Remove most highly linked nodes until each node is isolated
 exclude_node_val = c()
 
 while(T) {
+	## include : INDICES of vars in 'nodes' that are currently surviving
 	include = (1:length(nodes))[!(1:length(nodes)) %in% match(exclude_node_val,nodes)]
+	
+	## Draw the network graph b/w vars in 'include'
 	net_obj = network(net[include,include],directed=F)
 	network.vertex.names(net_obj) = nodes[include]
 	ggnet2(net_obj,size=5,label=T)
+	
+	## Check # of remaining links (exit if none)
 	row.sum = apply(net[include,include],1,sum)
 	if (all(row.sum == 0)) break
+	
+	## Exclude the 'hub' node (node w/ the most links)
 	most_link_node = names(row.sum)[which.max(row.sum)]
 	exclude_node_val = c(exclude_node_val,most_link_node)
 }
 
 	### Check final (isolated) state of variables
 ggnet2(net_obj,size=5,label=T)
-length(include); include
+length(include); nodes[include]
 
 	### Update 'input' to only contain the surviving explanatory variables (in 'include')
-
-input 	 = input[,c(include,resp.ind)]; head(input)
+input 	 = input[,c(nodes[include],resp.ind)]; head(input)
 resp.ind = which(colnames(input) == resp.var)
 
 
@@ -219,6 +227,26 @@ resp.ind = which(colnames(input) == resp.var)
 ##### ============== Main Program ==================
 ##### ============================================================================================
 ##### ============================================================================================
+
+##### Check if variables still have rare values and remove corresponding rows
+factors = names(factor_check)[factor_check]
+tmp 	= apply(input,2,function(v) { any(table(v)/length(v) < 0.01) })
+tmp 	= names(tmp)[tmp]
+vars 	= tmp[tmp %in% factors]
+
+idx = c()
+for (var in vars) {
+	tmp = input[,var]
+	tbl = table(tmp) / length(tmp)
+	target = names(tbl)[which(tbl < 0.01)]
+	if (length(target) > 0) {
+		#cat(colnames(dataset)[col], '\n')
+		#cat(target, '---', which(tmp %in% target), '\n\n')
+		idx = c(idx, which(tmp %in% target))
+	}
+}
+idx = sort(unique(idx))
+input = input[-idx,] 
 
 
 ##### Function call for stepwise AIC

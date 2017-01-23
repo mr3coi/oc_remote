@@ -24,8 +24,10 @@ stepwiseAIC = function(input,resp.var) {
 	# step.0$anova
 	# step.f$anova
 	
-	step0.coeff = ifelse(exp.vars %in% names(step.0$coefficients),1,0)
-	stepF.coeff = ifelse(exp.vars %in% names(step.f$coefficients),1,0)
+	step0.coeff = strsplit(as.character(step.0$formula)[3],split=" ")[[1]]
+	step0.coeff = ifelse(exp.vars %in% step0.coeff[step0.coeff != "+"],1,0)
+	stepF.coeff = strsplit(as.character(step.f$formula)[3],split=" ")[[1]]
+	stepF.coeff = ifelse(exp.vars %in% stepF.coeff[stepF.coeff != "+"],1,0)
 	
 	##### Picked
 	# var.full <- setdiff(exp_vars[[set_num]], substr(as.character(step.f$anova$Step), 3, 1000))
