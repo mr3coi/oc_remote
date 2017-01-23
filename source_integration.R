@@ -21,6 +21,11 @@ datafile <- "ova_db.csv"
 varfile  <- "ova_variable.csv" 
 setwd(wd) 
 
+source("perform_eval.R")
+source("stepAIC.R")
+source("lasso.R")
+
+
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -396,10 +401,6 @@ ova.db.csv <- ova.db.csv[,-idx]
 recurrence.ind = extract_ind(ova.db.csv,"Recurrence")
 ova.db.csv[,recurrence.ind][ova.db.csv[,recurrence.ind]==2] <- 1
 
-##### Find indices of columns w/ (almost : 95%) uniform values and remove such columns
-idx <- which( apply(ova.db.csv, 2, function(v) { any(table(v)/length(v) > 0.95) }) )
-ova.db.csv <- ova.db.csv[,-idx] 
-
 ##### Classify b/w categorical and numerical variables
 factor_check 		= sapply(strsplit(colnames(ova.db.csv),split="\n"), 
 							 function(v) ifelse(length(v) > 1,1,0))
@@ -417,9 +418,10 @@ colnames(ova.db.csv) = names(factor_check)
 ##### Check preprocessing results
 str(ova.db.csv)
 
-##### Check flawed values in remaining columns
-# lv_data = unlist(lapply(strsplit(colnames(ova.db.csv),split="\n"), length)) - 1
-# lv_count = unlist(lapply(ova.db.csv, function(v) length(unique(v[!is.na(v)])))) 
+
+##### Check for flawed values in remaining columns
+# lv_data  = unlist(lapply(strsplit(colnames(ova.db.csv),split="\n"), length)) - 1
+# lv_count = unlist(lapply(ova.db.csv, function(v) length(unique(v[!is.na(v)]))))
 # names(lv_count) = NULL
 # lv_count[factor_check==0] = 0
 # 
@@ -434,6 +436,27 @@ str(ova.db.csv)
 # 1st_Regimen : 0
 # Death : 4
 
+##### Remove rows w/ rare values(< 0.01) in factor columns			### TODO fix this part
+while(T) {
+	idx = c()
+	for (col in which(factor_check==1)) {
+		tmp = ova.db.csv[,col]
+		tbl = table(tmp) / length(tmp)
+		target = names(tbl)[which(tbl < 0.01)]
+		if (length(target) > 0) {
+			#cat(colnames(ova.db.csv)[col], '\n')
+			#cat(target, '---', which(tmp %in% target), '\n\n')
+			idx = c(idx,which(tmp %in% target))
+		}
+	}
+	idx = sort(unique(idx))
+	if (length(idx) == 0) break
+	ova.db.csv = ova.db.csv[-idx,] 
+}
+
+##### Find indices of columns w/ (almost : 95%) uniform values and remove such columns
+idx <- which( apply(ova.db.csv, 2, function(v) { any(table(v)/length(v) > 0.95) }) )
+ova.db.csv <- ova.db.csv[,-idx] 
 
 # ##### ============================================================================================
 # ##### ============================================================================================
@@ -569,6 +592,13 @@ if (any(is.nan(corr.pairs[,"p.value"]))) {
 	corr.pairs = corr.pairs[!(corr.pairs[,1] %in% idx | corr.pairs[,2] %in% idx),]
 }
 
+# if (any(corr.pairs[,"p.value"] > 1)) {
+# 	over_tbl = table(corr.pairs[which( corr.pairs[,"p.value"] > 1 ),-3])
+# 	ranking = sort(rank(over_tbl,ties.method="min"),decreasing=T)
+# 	idx		= as.numeric(names(ranking)[which(ranking == ranking[1])])
+# 	corr.pairs = corr.pairs[!(corr.pairs[,1] %in% idx | corr.pairs[,2] %in% idx),]
+# }
+
 	### temporary storage of 'corr.pairs'(full) for easier reload
 #save(corr.pairs,file='corr.pairs.RData')
 #load(file='corr.pairs.RData')
@@ -579,7 +609,7 @@ pair_count	= sapply(alpha_seq, function(v) { nrow(corr.pairs[corr.pairs[,3] < v,
 plot(-log10(alpha_seq),pair_count)
 
 	### Extract all pairs w/ p-value < threshold(alpha)	and sort by p-value in increasing order
-alpha 		= 1e-5
+alpha 		= 1e-8
 corr.edit 	= corr.pairs[corr.pairs[,3] < alpha,]
 corr.edit 	= corr.edit[order(corr.edit[,3]),]
 
@@ -604,13 +634,13 @@ for (i in 1:nrow(net)) {
 exclude_node_val = c()
 
 while(T) {
-	include = (1:length(nodes))[!(1:length(nodes)) %in% match(as.character(exclude_node_val),nodes)]
+	include = (1:length(nodes))[!(1:length(nodes)) %in% match(exclude_node_val,nodes)]
 	net_obj = network(net[include,include],directed=F)
 	network.vertex.names(net_obj) = nodes[include]
 	ggnet2(net_obj,size=5,label=T)
 	row.sum = apply(net[include,include],1,sum)
 	if (all(row.sum == 0)) break
-	most_link_node = as.numeric(names(row.sum)[which.max(row.sum)])
+	most_link_node = names(row.sum)[which.max(row.sum)]
 	exclude_node_val = c(exclude_node_val,most_link_node)
 }
 
@@ -619,6 +649,7 @@ ggnet2(net_obj,size=5,label=T)
 length(include); include
 
 	### Update 'input' to only contain the surviving explanatory variables (in 'include')
+
 input 	 = input[,c(include,resp.ind)]; head(input)
 resp.ind = which(colnames(input) == resp.var)
 
