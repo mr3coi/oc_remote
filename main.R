@@ -97,7 +97,7 @@ pair_count	= sapply(alpha_seq, function(v) { nrow(corr.pairs[corr.pairs[,3] < v,
 plot(-log10(alpha_seq),pair_count)
 
 	### Extract all pairs w/ p-value < threshold(alpha)	and sort by p-value in increasing order
-alpha 		= 1e-8
+alpha 		= 1e-5
 corr.edit 	= corr.pairs[corr.pairs[,3] < alpha,]
 corr.edit 	= corr.edit[order(corr.edit[,3]),]
 
@@ -163,19 +163,21 @@ tmp 	= names(tmp)[tmp]
 vars 	= tmp[tmp %in% factors]
 
 	### Remove the rows containing such rare values
-idx = c()
-for (var in vars) {
-	tmp 	= input[,var]
-	tbl 	= table(tmp) / length(tmp)
-	target 	= names(tbl)[which(tbl < 0.01)]
-	if (length(target) > 0) {
-		#cat(colnames(dataset)[col], '\n')
-		#cat(target, '---', which(tmp %in% target), '\n\n')
-		idx = c(idx, which(tmp %in% target))
+if (length(vars) > 0) {
+	idx = c()
+	for (var in vars) {
+		tmp 	= input[,var]
+		tbl 	= table(tmp) / length(tmp)
+		target 	= names(tbl)[which(tbl < 0.01)]
+		if (length(target) > 0) {
+			#cat(colnames(dataset)[col], '\n')
+			#cat(target, '---', which(tmp %in% target), '\n\n')
+			idx = c(idx, which(tmp %in% target))
+		}
 	}
+	idx = sort(unique(idx))
+	input = input[-idx,] 
 }
-idx = sort(unique(idx))
-input = input[-idx,] 
 
 
 ##### Function call for stepwise AIC
@@ -209,7 +211,7 @@ eval.result = performance(input, resp.ind, marker.mat, k=5); eval.result
 ########## Things to do #############
 ##########################################################
 
-# - Check validity of independence-test-based variable reduction process
+# - Check validity of independence-test-based variable reduction process (collinearity part)
 #	- Add code to allow manually choosing variables based on prior knowledge
 #	- Check why some p-values are >1, and whether it is ok to simply ignore them
 #	- Discuss how to undo the 'tangle' b/w variables and choose the best ones
