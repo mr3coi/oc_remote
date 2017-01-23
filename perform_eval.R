@@ -74,7 +74,6 @@ doLOGIT = function(train.dat, test.dat, resp.ind, marker) {
 	resp 	= colnames(train.dat)[resp.ind]
 	vars	= colnames(train.dat)
 	f 		= as.formula(paste(resp, "~", paste(vars[which(marker==1)],collapse="+")))
-# 	model 	= train(f, data=train.dat,method="glm")
 	model 	= glm(f,family=binomial(link=logit),data=train.dat)
 	pred	= predict(model, test.dat, type="response")
 # 	pred 	= prediction(pred, te.grp, label.ordering = NULL)			### TODO fix to remove te.grp

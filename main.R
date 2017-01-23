@@ -26,6 +26,7 @@ source("stepAIC.R")
 source("lasso.R")
 source("perform_eval.R")
 source("util_fn.R")
+source("corr_pair.R")
 
 ##### ============================================================================================
 ##### ============================================================================================
@@ -86,84 +87,9 @@ input 		= ova.db.csv.sub[row_NA,]
 ##### ============================================================================================
 ##### ============================================================================================
 
-exp.vars = colnames(input)[colnames(input)!=resp.var]	## potential explanatory variables in 'input'
-factor_check = unlist(lapply(input,is.factor))			## boolean for factor variables in 'input'
-
 ##### Test for and remove collinear variables
-corr.pairs = matrix(nc=3,nr=0)
-colnames(corr.pairs) = c("var1","var2","p.value")
-	
-options(warn=0)
-require(car)
-
-for (var1.ind in 1:(length(exp.vars)-1)) {
-	var1 = exp.vars[var1.ind]
-	
-	for (var2.ind in (var1.ind+1):length(exp.vars)) {
-		var2 		 = exp.vars[var2.ind]
-
-		### b/w categorical variables	=> Chi-sq. independence test
-		if (prod(factor_check[c(var1,var2)]) == 1) {
-			tbl = table(input[,var1],input[,var2])
-			corr.pairs = rbind(corr.pairs, c(var1.ind,var2.ind, chisq.test(tbl)$p.value))
-		}
-		### b/w numerical variables		=> Linear regression independence test
-		else if (sum(factor_check[c(var1,var2)]) == 0) {
-			#cat(var1,var2,'\n')
-			f 		= as.formula(paste(var1,var2,sep="~"))
-			model 	= lm(f,data=input)
-			p.value	= as.data.frame(anova(model))[1,5]
-			corr.pairs = rbind(corr.pairs, c(var1.ind,var2.ind, p.value))
-		}
-		### b/w a numerical variable and a categorical variable
-		###		=> Logistic regression independence test
-		else {
-			categ = ifelse(factor_check[var1]==1, var1, var2)
-			numer = ifelse(factor_check[var1]==1, var2, var1)
-			lv	  = length(unique(input[,categ]))
-			f 		= as.formula(paste(categ, numer, sep="~"))
-			cat("cat : '", categ, "', num : '", numer, "', lv : ", lv, '\n')
-			
-			if (lv == 1) { p.value = NaN }	# Uniform column => pass
-			else if (lv == 2) { 			# Binomial Logistic Regression (assuming normality)
-				model 	= glm(f,data=input,family=binomial(link=logit))
-				p.value	= as.data.frame(anova(model))[1,5]
-			}
-			else {							# Multinomial Logistic Regression
-				input$relv	= relevel(input[,categ], ref=levels(input[,categ])[1])
-				f 			= as.formula(paste("relv", numer, sep="~"))
-				model 	  	= multinom(f, data=input)
-				## Use Wald Z-test under assumption of normality
-				# wald_z		= summary(model)$coefficients / summary(model)$standard.errors
-				# p.value 	= (1 - pnorm(abs(wald_z),0,1)) * 2	# Both ends
-				p.value 	= unlist(Anova(model))[3]
-			}
-			corr.pairs = rbind(corr.pairs, c(var1.ind,var2.ind, p.value))
-		}
-	}
-}
-	### tidy-up (restoration to original state)
-input = input[,-length(colnames(input))]
-options(warn=1)
-
-	### Remove defected variables (var.s causing NaN p-values)
-if (any(is.nan(corr.pairs[,"p.value"]))) {
-	NaN_tbl = table(corr.pairs[which(is.nan(corr.pairs[,"p.value"])),-3])
-	ranking = sort(rank(NaN_tbl,ties.method="min"),decreasing=T)
-	idx		= as.numeric(names(ranking)[which(ranking == ranking[1])])
-	corr.pairs = corr.pairs[!(corr.pairs[,1] %in% idx | corr.pairs[,2] %in% idx),]
-}
-
-# if (any(corr.pairs[,"p.value"] > 1)) {
-# 	over_tbl = table(corr.pairs[which( corr.pairs[,"p.value"] > 1 ),-3])
-# 	ranking = sort(rank(over_tbl,ties.method="min"),decreasing=T)
-# 	idx		= as.numeric(names(ranking)[which(ranking == ranking[1])])
-# 	corr.pairs = corr.pairs[!(corr.pairs[,1] %in% idx | corr.pairs[,2] %in% idx),]
-# }
-
-	### temporary storage of 'corr.pairs'(full) for easier reload
-#save(corr.pairs,file='corr.pairs.RData')
-#load(file='corr.pairs.RData')
+	### Generate matrix of p-values from independence tests for each variable pair
+corr.pairs  = pair.indep(input)
 
 	### Plot # of pairs against thresholds for p-value to find optimum threshold
 alpha_seq	= c(1 %o% 10^(-3:-15))
@@ -176,6 +102,7 @@ corr.edit 	= corr.pairs[corr.pairs[,3] < alpha,]
 corr.edit 	= corr.edit[order(corr.edit[,3]),]
 
 	### Check names of and plot variable pairs to check whether they are truly correlated
+# exp.vars = colnames(input)[colnames(input)!=resp.var]	## potential explanatory variables in 'input'
 # var1.ind = 21
 # var2.ind = 22
 # exp.vars[c(var1.ind,var2.ind)]
@@ -228,17 +155,19 @@ resp.ind = which(colnames(input) == resp.var)
 ##### ============================================================================================
 ##### ============================================================================================
 
-##### Check if variables still have rare values and remove corresponding rows
+##### Check if variables still have rare values (freq. < 0.01) and remove corresponding rows
+factor_check = unlist(lapply(input,is.factor))			## boolean for factor variables in 'input'
 factors = names(factor_check)[factor_check]
 tmp 	= apply(input,2,function(v) { any(table(v)/length(v) < 0.01) })
 tmp 	= names(tmp)[tmp]
 vars 	= tmp[tmp %in% factors]
 
+	### Remove the rows containing such rare values
 idx = c()
 for (var in vars) {
-	tmp = input[,var]
-	tbl = table(tmp) / length(tmp)
-	target = names(tbl)[which(tbl < 0.01)]
+	tmp 	= input[,var]
+	tbl 	= table(tmp) / length(tmp)
+	target 	= names(tbl)[which(tbl < 0.01)]
 	if (length(target) > 0) {
 		#cat(colnames(dataset)[col], '\n')
 		#cat(target, '---', which(tmp %in% target), '\n\n')
@@ -267,4 +196,33 @@ rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae"
 
 ##### Run comparison
 eval.result = performance(input, resp.ind, marker.mat, k=5); eval.result
+
+
+
+
+
+
+
+
+
+##########################################################
+########## Things to do #############
+##########################################################
+
+# - Check validity of independence-test-based variable reduction process
+#	- Add code to allow manually choosing variables based on prior knowledge
+#	- Check why some p-values are >1, and whether it is ok to simply ignore them
+#	- Discuss how to undo the 'tangle' b/w variables and choose the best ones
+# - Data-related issues
+#	- Check whether "Parity" and "Other_sites" are actually categorical variables
+#	- Fix flawed data points in the given data
+#	- Check if too many variables are removed during preprocessing
+#	- Find a way to avoid removing rows again in 'Main Program' stage
+# - Discuss the validity / significance of the calculated results
+# - lasso.R
+#	- Check whether separating training/test sets is necessary for variable selection
+# - stepAIC.R
+#	- Check the necessity of the codes commented out
+# - perform_eval.R
+#	- (doLOGIT) difference b/w 'predict' and 'prediction' objects?
 
