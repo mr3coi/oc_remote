@@ -94,7 +94,9 @@ corr.pairs  = pair.indep(input)
 	### Plot # of pairs against thresholds for p-value to find optimum threshold
 alpha_seq	= c(1 %o% 10^(-3:-15))
 pair_count	= sapply(alpha_seq, function(v) { nrow(corr.pairs[corr.pairs[,3] < v,]) })
-plot(-log10(alpha_seq),pair_count)
+plot(-log10(alpha_seq),pair_count,xlab="-log10(alpha)",ylab="# of variable pairs",
+	 main="dist. of dependent variable pairs\nper threshold")
+abline(h=100)
 
 	### Extract all pairs w/ p-value < threshold(alpha)	and sort by p-value in increasing order
 alpha 		= 1e-5
@@ -103,10 +105,10 @@ corr.edit 	= corr.edit[order(corr.edit[,3]),]
 
 	### Check names of and plot variable pairs to check whether they are truly correlated
 # exp.vars = colnames(input)[colnames(input)!=resp.var]	## potential explanatory variables in 'input'
-# var1.ind = 21
-# var2.ind = 22
+# var1.ind = 12
+# var2.ind = 13
 # exp.vars[c(var1.ind,var2.ind)]
-# plot(input[,exp.vars[var1.ind]],input[,exp.vars[var2.ind]])
+# plot(input[,exp.vars[var1.ind]],input[,exp.vars[var2.ind]],xlab=exp.vars[var1.ind],ylab=exp.vars[var2.ind])
 
 	### Plot a network graph for visualization of key variables
 	### 	& Remove most highly linked nodes until each node is isolated
@@ -119,6 +121,7 @@ for (i in 1:nrow(net)) {
 	}
 }
 
+## Container for indices of variables in 'input' that need to be removed due to dependency
 exclude_node_val = c()
 
 while(T) {
@@ -141,10 +144,10 @@ while(T) {
 
 	### Check final (isolated) state of variables
 ggnet2(net_obj,size=5,label=T)
-length(include); nodes[include]
+length(exclude_node_val); exclude_node_val
 
-	### Update 'input' to only contain the surviving explanatory variables (in 'include')
-input 	 = input[,c(nodes[include],resp.ind)]; head(input)
+	### Update 'input' to exclude variables in 'exclude_node_val'
+input 	 = input[,-as.numeric(exclude_node_val)]; dim(input)
 resp.ind = which(colnames(input) == resp.var)
 
 
@@ -197,6 +200,7 @@ colnames(marker.mat) = colnames(input[,-resp.ind])
 rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae")
 
 ##### Run comparison
+# k : # of repetitions for CV
 eval.result = performance(input, resp.ind, marker.mat, k=5); eval.result
 
 
@@ -227,4 +231,4 @@ eval.result = performance(input, resp.ind, marker.mat, k=5); eval.result
 #	- Check the necessity of the codes commented out
 # - perform_eval.R
 #	- (doLOGIT) difference b/w 'predict' and 'prediction' objects?
-
+# 	- Run kNN w/ various k values

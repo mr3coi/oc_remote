@@ -34,7 +34,7 @@ preProc = function(dataset) {
 	idx <- which(apply(dataset, 2, function(v) class(try(as.numeric(v), T))=='try-error'))
 	options(warn=1);
 	
-	##### Convert date info into numeric data (YYYYMMDD)
+		### Convert date info into numeric data (YYYYMMDD)
 	pattern = "\\d+\\.\\d+\\.\\d+"
 	idx2 = c()
 	
@@ -46,21 +46,21 @@ preProc = function(dataset) {
 	}
 	idx = idx[!idx %in% idx2]
 	
-	##### Additional manipulation for 'Stage' column (transform "1a" ~ "4" => 1,2,3,4)
+		### Additional manipulation for 'Stage' column (transform "1a" ~ "4" => 1,2,3,4)
 	ref 		= c(rep(1,3),rep(2,3),rep(3,3),4)
 	names(ref)	= c("1a","1b","1c","2a","2b","2c","3a","3b","3c","4")
 	stage.ind	= extract_ind(dataset,"Stage")
 	dataset[,stage.ind] = ref[dataset[,stage.ind]]
 	idx 		= idx[idx != stage.ind]
 	
-	##### Additional manipulation for 'Recur_Site' column
+		### Additional manipulation for 'Recur_Site' column
 	# recur.ind = extract_ind(dataset,"Recur_Site")
 	# dataset[,recur.ind] = sapply(dataset[,recur.ind],
 	# 								function(v) {paste(sort(unlist(strsplit(v,split=","))),collapse="")})
 	# dataset[,recur.ind]
 	# idx = idx[idx != recur.ind]
 	
-	##### Extract numeric values at the beginning
+		### Extract numeric values at the beginning
 	pattern = "(\\d).*"
 	idx2 = c()
 	for (col in idx) {
@@ -71,7 +71,7 @@ preProc = function(dataset) {
 	}
 	idx = idx[!idx %in% idx2]
 	
-	### Delete the remaining non-numeric columns (-1)
+		### Delete the remaining non-numeric columns (-1)
 	dataset <- dataset[,-idx]
 	
 	##### Convert character values in dataset into numeric values

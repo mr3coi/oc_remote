@@ -20,14 +20,14 @@ stepwiseAIC = function(input,resp.var) {
 	#step.0x <- step(nul, scope=list(lower=nul,upper=mod), direction="both")
 	#step.fx <- step(mod, direction="both")
 	
-	# ##### Show ANOVA tables from the above regressions
-	# step.0$anova
-	# step.f$anova
-	
 	step0.coeff = strsplit(as.character(step.0$formula)[3],split=" ")[[1]]
 	step0.coeff = ifelse(exp.vars %in% step0.coeff[step0.coeff != "+"],1,0)
 	stepF.coeff = strsplit(as.character(step.f$formula)[3],split=" ")[[1]]
 	stepF.coeff = ifelse(exp.vars %in% stepF.coeff[stepF.coeff != "+"],1,0)
+	
+	# ##### Show ANOVA tables from the above regressions
+	# step.0$anova
+	# step.f$anova
 	
 	##### Picked
 	# var.full <- setdiff(exp_vars[[set_num]], substr(as.character(step.f$anova$Step), 3, 1000))

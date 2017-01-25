@@ -138,7 +138,7 @@ performance = function(input, resp.ind, marker.mat, k, knn.NN=3, svm.kernel='rad
 	}
 
 	### Compute mean AUC	
-	result[["MEAN"]] = Reduce("+",result) / k
+	result[[paste0("MEAN_",k)]] = Reduce("+",result) / k
 	
 	return(result)
 }
