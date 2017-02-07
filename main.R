@@ -12,6 +12,7 @@ library(nnet)
 library(glmnet)
 library(caret)
 library(AUC)
+library(car)
 
 #require(devtools); devtools::install_github("briatte/ggnet")	### Install if necessary
 library(ggnet); library(network); library(sna)
@@ -87,6 +88,19 @@ input 		= ova.db.csv.sub[row_NA,]
 ##### ============================================================================================
 ##### ============================================================================================
 
+exp.vars = colnames(input)[colnames(input)!=resp.var]
+
+##### Correlation b/w surviving explanatory variables
+#cor(input)
+
+##### VIF calculation
+vif_result = vif(glm(Recurrence ~ ., family=binomial(link=logit), data=input))
+vif_result = cbind(match(rownames(vif_result),exp.vars),vif_result)
+colnames(vif_result)[1] = "exp.var_index"
+vif_result = vif_result[order(vif_result[,4],decreasing=T),]
+vif_high = vif_result[vif_result[,4] > 10,1]
+names(vif_high) = NULL
+
 ##### Test for and remove collinear variables
 	### Generate matrix of p-values from independence tests for each variable pair
 corr.pairs  = pair.indep(input)
@@ -97,6 +111,7 @@ pair_count	= sapply(alpha_seq, function(v) { nrow(corr.pairs[corr.pairs[,3] < v,
 plot(-log10(alpha_seq),pair_count,xlab="-log10(alpha)",ylab="# of variable pairs",
 	 main="dist. of dependent variable pairs\nper threshold")
 abline(h=100)
+abline(v=5)
 
 	### Extract all pairs w/ p-value < threshold(alpha)	and sort by p-value in increasing order
 alpha 		= 1e-5
@@ -124,12 +139,21 @@ for (i in 1:nrow(net)) {
 ## Container for indices of variables in 'input' that need to be removed due to dependency
 exclude_node_val = c()
 
+include = (1:length(nodes))[!(1:length(nodes)) %in% match(exclude_node_val,nodes)]
+net_obj = network(net[include,include],directed=F)
+net_obj %v% "vif" = ifelse(include %in% vif_high, "MC", "non-MC")
+net_obj %v% "color" = ifelse(net_obj %v% "vif" == "MC", "steelblue", "grey")
+
+network.vertex.names(net_obj) = nodes[include]
+ggnet2(net_obj,size=5,label=T,color="color")
+
 while(T) {
 	## include : INDICES of vars in 'nodes' that are currently surviving
 	include = (1:length(nodes))[!(1:length(nodes)) %in% match(exclude_node_val,nodes)]
 	
 	## Draw the network graph b/w vars in 'include'
 	net_obj = network(net[include,include],directed=F)
+	net_obj %v% "vif" = ifelse(include %in% vif_high, "MC", "non-MC")
 	network.vertex.names(net_obj) = nodes[include]
 	ggnet2(net_obj,size=5,label=T)
 	
@@ -201,7 +225,7 @@ rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae"
 
 ##### Run comparison
 # k : # of repetitions for CV
-eval.result = performance(input, resp.ind, marker.mat, k=5); eval.result
+eval.result = performance(input, resp.ind, marker.mat, CV.k=5); eval.result
 
 
 

@@ -98,48 +98,53 @@ doLOGIT = function(train.dat, test.dat, resp.ind, marker) {
 # k				: # of folds for CV
 # knn.NN		: # of nearest neighbors for kNN algorithm
 # svm.kernel	: type of kernel function to be used for SVM
-performance = function(input, resp.ind, marker.mat, k, knn.NN=3, svm.kernel='radial') {
+performance = function(input, resp.ind, marker.mat, CV.k, knn.NN=3, svm.kernel='radial') {
 	### Assert that the response variable column is a factor
 	if(!is.factor(input[,resp.ind])) stop("Make sure the column for response variable is a factor.")
 	
 	### Definition
-	result	= list()								# container for computed AUC results
 	algs	= c("RF", "SVM", "kNN", 'LOGISTIC')		# ML algorithms for computing AUC
+	results = list()
  	
-	##### k-fold CV
-	folds	= createFolds(input[,resp.ind],k=k,returnTrain=F)			# create folds w/ specified k
-
-	for (i in 1:k) {
-		train.dat 	= input[-folds[[i]],]
-		test.dat 	= input[folds[[i]],]
-
-	 	### Create 'res.all' to contain results
-	 	cname = paste(algs, 'AUC', sep='_')
-	 	res.all = matrix(nrow=nrow(marker.mat), ncol=length(algs))
-	 	colnames(res.all) = cname
-	 	rownames(res.all) = apply(marker.mat, 1, function(mm) {paste(which(mm==1), collapse = ',')})
-	 	rownames(res.all) = paste0(rownames(marker.mat),'_',rownames(res.all))
-	 	
-	 	### Call each function to compute AUC's
-	 	for( j in 1:nrow(marker.mat) ) {
-	 		### Console progress indicator
-	 		cat('/ marker set', j, ' / ', nrow(marker.mat), ' total /\n')
-	 		
-	 		### Generate AUC values using the above submatrices and store in 'res.all'
-	 		tmp.rf		<- doRF(train.dat, test.dat, resp.ind, marker.mat[j,])
-	 		tmp.svm 	<- doSVM(train.dat, test.dat, resp.ind, marker.mat[j,], kernel=svm.kernel)
-	 		tmp.knn 	<- doKNN(train.dat, test.dat, resp.ind, marker.mat[j,], NN=knn.NN)
-	 		tmp.logit 	<- doLOGIT(train.dat, test.dat, resp.ind, marker.mat[j,])
-	 		res.all[j,] <- c(tmp.rf, tmp.svm, tmp.knn, tmp.logit)
-	 	}
-	 	
-	 	### Store AUC values to 'result'
- 		result[[i]]	= res.all
-	}
-
-	### Compute mean AUC	
-	result[[paste0("MEAN_",k)]] = Reduce("+",result) / k
+	### Conduct CV per each 'k' in given argument 'K'
+	for (k in CV.k) {
+		result	= list()								# container for computed AUC results
+		
+		##### k-fold CV
+		folds	= createFolds(input[,resp.ind],k=k,returnTrain=F)			# create folds w/ specified k
+		
+		for (i in 1:k) {
+			train.dat 	= input[-folds[[i]],]
+			test.dat 	= input[folds[[i]],]
 	
-	return(result)
+		 	### Create 'res.all' to contain results
+		 	cname = paste(algs, 'AUC', sep='_')
+		 	res.all = matrix(nrow=nrow(marker.mat), ncol=length(algs))
+		 	colnames(res.all) = cname
+		 	rownames(res.all) = apply(marker.mat, 1, function(mm) {paste(which(mm==1), collapse = ',')})
+		 	rownames(res.all) = paste0(rownames(marker.mat),'_',rownames(res.all))
+		 	
+		 	### Call each function to compute AUC's
+		 	for( j in 1:nrow(marker.mat) ) {
+		 		### Console progress indicator
+		 		cat('/ marker set', j, ' / ', nrow(marker.mat), ' total /\n')
+		 		
+		 		### Generate AUC values using the above submatrices and store in 'res.all'
+		 		tmp.rf		<- doRF(train.dat, test.dat, resp.ind, marker.mat[j,])
+		 		tmp.svm 	<- doSVM(train.dat, test.dat, resp.ind, marker.mat[j,], kernel=svm.kernel)
+		 		tmp.knn 	<- doKNN(train.dat, test.dat, resp.ind, marker.mat[j,], NN=knn.NN)
+		 		tmp.logit 	<- doLOGIT(train.dat, test.dat, resp.ind, marker.mat[j,])
+		 		res.all[j,] <- c(tmp.rf, tmp.svm, tmp.knn, tmp.logit)
+		 	}
+		 	
+		 	### Store AUC values to 'result'
+	 		result[[i]]	= res.all
+		}
+		### Compute mean AUC	
+		result[[paste0("MEAN_",k)]] = Reduce("+",result) / k
+		results[[k]] = result
+	}
+	
+	return(results)
 }
 

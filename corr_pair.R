@@ -48,7 +48,7 @@ pair.indep = function(input) {
 				if (lv == 1) { p.value = NaN }	# Uniform column => pass
 				else if (lv == 2) { 			# Binomial Logistic Regression (assuming normality)
 					model 	= glm(f,data=input,family=binomial(link=logit))
-					p.value	= as.data.frame(anova(model))[1,5]
+					p.value	= summary(model)$coefficients[2,4]
 				}
 				else {							# Multinomial Logistic Regression
 					input$relv	= relevel(input[,categ], ref=levels(input[,categ])[1])
