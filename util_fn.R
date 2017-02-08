@@ -5,11 +5,23 @@
 ##### ============================================================================================
 ##### ============================================================================================
 
-##### Date-to-int conversion function 			##### TODO convert to # of days since 1900-01-01
+##### Date-to-int conversion function			##### TODO convert to # of days since 1900-01-01
 date_conv = function(date_string) {
-	date = as.vector(sapply(strsplit(date_string,split="\\."),strtoi))
-	date = sum(date*c(10000,100,1))
-	return(date)
+	date = strsplit(date_string,split=c("\\.|-"))
+	date = as.numeric(unlist(date))
+	
+	### Return 'NA' if invalid 'date_string' given
+	if (any(is.na(date))) return(NA)
+	#date = sum(date*c(10000,100,1))
+	
+	leap = (date[1]-1901) %/% 4
+	days = 365 * (date[1]-1901) + leap + date[3]
+	this_leap = date[1] %% 4 == 0
+	days_per_month = c(31,28,31,30,31,30,31,31,30,31,30,31)
+	if (date[2] > 1) days = days + sum(days_per_month[1:(date[2]-1)])
+	if (date[2] > 2 && this_leap) days = days + 1
+	
+	return(days)
 }
 
 ##### Returns the column index in 'df' of the variable w/ specified 'name'
