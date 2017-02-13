@@ -191,21 +191,23 @@ if (length(vars) > 0) {
 result_AIC	= stepwiseAIC(input,resp.var)
 
 ##### Function call for regularized regression
-result_auc	= regular.CV(input, resp.ind, crit="auc"); 	 result_auc
-result_dev	= regular.CV(input, resp.ind, crit="dev"); 	 result_dev
-result_cls	= regular.CV(input, resp.ind, crit="class"); result_cls
-result_mae	= regular.CV(input, resp.ind, crit="mae"); 	 result_mae
+result_auc	= regular.CV(reg_input, resp.ind, crit="auc"); 	 result_auc
+result_dev	= regular.CV(reg_input, resp.ind, crit="dev"); 	 result_dev
+result_cls	= regular.CV(reg_input, resp.ind, crit="class"); result_cls
+result_mae	= regular.CV(reg_input, resp.ind, crit="mae"); 	 result_mae
 
 ##### 'marker.mat' generation
-marker.mat 			 = rbind(result_AIC$step0,result_AIC$stepF,
-					   		 result_auc$vars, result_dev$vars,
-					   		 result_cls$vars, result_mae$vars)
-colnames(marker.mat) = colnames(input[,-resp.ind])
+AIC_0 = ifelse(colnames(reg_input) %in% colnames(input)[-ncol(input)][result_AIC$step0 == 1],1,0)
+AIC_F = ifelse(colnames(reg_input) %in% colnames(input)[-ncol(input)][result_AIC$stepF == 1],1,0)
+
+marker.mat 			 = rbind(AIC_0, AIC_F, result_auc$vars,
+					   		 result_dev$vars, result_cls$vars, result_mae$vars)
+colnames(marker.mat) = colnames(reg_input[,-resp.ind])
 rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae")
 
 ##### Run comparison
 # k : # of repetitions for CV
-eval.result = performance(input, resp.ind, marker.mat, CV.k=5); eval.result
+eval.result = performance(input, resp.ind, marker.mat, CV.k=c(3,5)); eval.result
 
 
 
