@@ -45,7 +45,7 @@ ova.db.csv = preProc(ova.db.csv,c(1:52),resp.var)
 
 ##### Extract relevant sub-data.frame from given data	=>	'ova.db.csv.sub'
 	### Exclude columns that are obviously meaningless or irrelevant
-avoid 		   = c(1,2)								# 1,2 : date variables
+avoid 		   = c(1,2,30:32)						# 1,2 : date variables
 ova.db.csv.sub = ova.db.csv[,-avoid]				# exclude all variables w/ column indices in 'avoid'
 resp.ind 	   = which(colnames(ova.db.csv.sub) == resp.var)	# index of response variable
 
@@ -72,12 +72,14 @@ exp.vars = colnames(input)[colnames(input)!=resp.var]
 #cor(input)
 
 ##### VIF calculation
+vif_alias  = alias(glm(Recurrence ~ ., family=binomial(link=logit), data=input))	### Check for perfect MC
+
 vif_result = vif(glm(Recurrence ~ ., family=binomial(link=logit), data=input))
-vif_result = cbind(match(rownames(vif_result),exp.vars),vif_result)
-colnames(vif_result)[1] = "exp.var_index"
-vif_result = vif_result[order(vif_result[,4],decreasing=T),]
-vif_high = vif_result[vif_result[,4] > 10,1]
-names(vif_high) = NULL
+vif_result = cbind(match(names(vif_result),exp.vars),vif_result)
+colnames(vif_result) = c("exp.var_index","vif")
+vif_result = vif_result[order(vif_result[,2],decreasing=T),]
+vif_high = vif_result[vif_result[,2] > 10,1]
+#names(vif_high) = NULL
 
 ##### Test for and remove collinear variables
 	### Generate matrix of p-values from independence tests for each variable pair
@@ -113,15 +115,13 @@ for (i in 1:nrow(net)) {
 			(corr.edit[,1] %in% nodes[j] & corr.edit[,2] %in% nodes[i])) ) net[i,j] = net[j,i] = 1
 	}
 }
-
-## Container for indices of variables in 'input' that need to be removed due to dependency
-exclude_node_val = c()
-
+exclude_node_val = c() 		### Container for indices of variables in 'input'
+							###		that need to be removed due to dependency
 include = (1:length(nodes))[!(1:length(nodes)) %in% match(exclude_node_val,nodes)]
 net_obj = network(net[include,include],directed=F)
-net_obj %v% "vif" = ifelse(include %in% vif_high, "MC", "non-MC")
+		### Highlight nodes w/ high VIF value
+net_obj %v% "vif"   = ifelse(nodes[include] %in% vif_high, "MC", "non-MC")
 net_obj %v% "color" = ifelse(net_obj %v% "vif" == "MC", "steelblue", "grey")
-
 network.vertex.names(net_obj) = nodes[include]
 ggnet2(net_obj,size=5,label=T,color="color")
 
@@ -149,8 +149,10 @@ ggnet2(net_obj,size=5,label=T)
 length(exclude_node_val); exclude_node_val
 
 	### Update 'input' to exclude variables in 'exclude_node_val'
-input 	 = input[,-as.numeric(exclude_node_val)]; dim(input)
-resp.ind = which(colnames(input) == resp.var)
+reg_input 	 = input 			### Dataset w/ variables not removed (for regularization)
+input 	 	 = input[,-as.numeric(exclude_node_val)]; dim(input)	### Dataset w/ variables removed (for AIC)
+reg_resp.ind = resp.ind
+resp.ind 	 = which(colnames(input) == resp.var)
 
 
 
