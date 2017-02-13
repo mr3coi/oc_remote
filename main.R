@@ -18,7 +18,7 @@ library(car)
 library(ggnet); library(network); library(sna)
 
 wd 		 <- "/Users/SJC/Documents/practice/internship/ovarian_cancer"
-datafile <- "ova_db.csv" 
+datafile <- "ova_db2.csv" 
 varfile  <- "ova_variable.csv" 
 setwd(wd) 
 
@@ -37,39 +37,17 @@ source("corr_pair.R")
 
 ##### Read and preprocess source data
 ova.db.csv = as.data.frame(read.csv(datafile,skip=2,stringsAsFactors=F,check.names=F)) 
-ova.db.csv = preProc(ova.db.csv)
 
-##### Interested response variables
-outcomes = c("Recurrence",
-			  "Platinum_resistance_6mo", "Platinum-resistance_group",
-			  "End_Date_1st_regimen", "Op_date",
-			  "Dx_date", "Death", "Last_FU_Date", "Expired_Date",
-			  "Residual_tumor_site_1st_debulking", "Residual_tumor_size_1st_debulking",
-			  "PLN_status", "PALN_status")
-##### Reference
-outcome_index = c("CR",
-				  "CS", "CT",
-				  "CO", "BF",
-				  "E", "DC", "DD", "DE",
-				  "CI", "CJ",
-				  "AX", "AY")
-outcome_idx = list(1,2:3,4:5,6:9,10:11,12:13)
-
-##### Choose which set of response variable and explanatory variables to analyze
-set_num 	= 1
-var_num 	= 1
-resp.var 	= outcomes[outcome_idx[[set_num]]]
-resp.var 	= resp.var[resp.var %in% colnames(ova.db.csv)][var_num]
-resp.ind	= which(colnames(ova.db.csv) == resp.var)
+##### Extract relevant portion of the given source data and preprocess it
+col_index  = 1:52			### Column indices of explanatory variables to use
+resp.var   = "Recurrence"		### Name of response variable
+ova.db.csv = preProc(ova.db.csv,c(1:52),resp.var)
 
 ##### Extract relevant sub-data.frame from given data	=>	'ova.db.csv.sub'
-	### Avoid all columns corresponding to post-surgery (specify indices of variables to avoid here)
-avoid 		= search_colname(ova.db.csv,"Start_Date_1st_regimen"):length(colnames(ova.db.csv))
-	### Avoid other pre/during-surgery columns that are obviously meaningless or irrelevant
-avoid 		= c(avoid, 1:3, 5, 43)
-avoid 		= avoid[avoid != resp.ind]		# keep response variable if included in 'avoid'
-ova.db.csv.sub = ova.db.csv[,-avoid]		# exclude all variables w/ column indices in 'avoid'
-resp.ind	= which(colnames(ova.db.csv.sub) == resp.var)	# update 'resp.ind'
+	### Exclude columns that are obviously meaningless or irrelevant
+avoid 		   = c(1,2)								# 1,2 : date variables
+ova.db.csv.sub = ova.db.csv[,-avoid]				# exclude all variables w/ column indices in 'avoid'
+resp.ind 	   = which(colnames(ova.db.csv.sub) == resp.var)	# index of response variable
 
 ##### Preprocess : remove NA's	=>	'input' (final data form)
 row_NA		= apply(ova.db.csv.sub,1,function(v) {sum(is.na(v)) == 0})
