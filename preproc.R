@@ -304,7 +304,7 @@ preProc = function(input, col_index, resp.var) {
 	# }
 	
 	##### Find indices of columns w/ (almost : 98%) uniform values and remove such columns
-	idx = which( apply(dataset, 2, function(v) { any(table(v)/length(v) > 0.99) }) )
+	idx = which( apply(dataset, 2, function(v) { any(table(v)/length(v) > 0.98) }) )
 	sapply(idx,function(i) table(dataset[,i]))			### Check distributions of variables
 	dataset <- dataset[,-idx] 
 

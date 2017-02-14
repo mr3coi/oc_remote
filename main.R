@@ -45,7 +45,7 @@ ova.db.csv = preProc(ova.db.csv,c(1:52),resp.var)
 
 ##### Extract relevant sub-data.frame from given data	=>	'ova.db.csv.sub'
 	### Exclude columns that are obviously meaningless or irrelevant
-avoid 		   = c(1,2,30:32)						# 1,2 : date variables
+avoid 		   = c(1,2,25:28,36:39)		# 1,2 : date variables, 25:28 : BMI&BMI_category1, 36:39 : PLT, etc,
 ova.db.csv.sub = ova.db.csv[,-avoid]				# exclude all variables w/ column indices in 'avoid'
 resp.ind 	   = which(colnames(ova.db.csv.sub) == resp.var)	# index of response variable
 
@@ -191,23 +191,24 @@ if (length(vars) > 0) {
 result_AIC	= stepwiseAIC(input,resp.var)
 
 ##### Function call for regularized regression
-result_auc	= regular.CV(reg_input, resp.ind, crit="auc"); 	 result_auc
-result_dev	= regular.CV(reg_input, resp.ind, crit="dev"); 	 result_dev
-result_cls	= regular.CV(reg_input, resp.ind, crit="class"); result_cls
-result_mae	= regular.CV(reg_input, resp.ind, crit="mae"); 	 result_mae
+eps = 10^(-3)		### Threshold size of coefficients
+result_auc	= regular.CV(reg_input, reg_resp.ind, thres=eps, crit="auc"); 	result_auc
+result_dev	= regular.CV(reg_input, reg_resp.ind, thres=eps, crit="dev"); 	result_dev
+result_cls	= regular.CV(reg_input, reg_resp.ind, thres=eps, crit="class"); result_cls
+result_mae	= regular.CV(reg_input, reg_resp.ind, thres=eps, crit="mae"); 	result_mae
 
 ##### 'marker.mat' generation
-AIC_0 = ifelse(colnames(reg_input) %in% colnames(input)[-ncol(input)][result_AIC$step0 == 1],1,0)
-AIC_F = ifelse(colnames(reg_input) %in% colnames(input)[-ncol(input)][result_AIC$stepF == 1],1,0)
+AIC_0 = ifelse(exp.vars %in% colnames(input)[-ncol(input)][result_AIC$step0 == 1],1,0)
+AIC_F = ifelse(exp.vars %in% colnames(input)[-ncol(input)][result_AIC$stepF == 1],1,0)
 
 marker.mat 			 = rbind(AIC_0, AIC_F, result_auc$vars,
 					   		 result_dev$vars, result_cls$vars, result_mae$vars)
-colnames(marker.mat) = colnames(reg_input[,-resp.ind])
+colnames(marker.mat) = exp.vars
 rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae")
 
 ##### Run comparison
-# k : # of repetitions for CV
-eval.result = performance(input, resp.ind, marker.mat, CV.k=c(3,5)); eval.result
+	### k : # of repetitions for CV
+eval.result = performance(reg_input, reg_resp.ind, marker.mat, CV.k=c(3,5)); eval.result
 
 
 

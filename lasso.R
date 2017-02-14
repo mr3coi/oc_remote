@@ -30,13 +30,34 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 					  family="binomial", nfolds=k, nlambda=50, type.measure=crit)
 	
 	##### Plot the generated model
-	#plot(model,xvar="lambda",label=T)
+	#plot(model)
 	
 	##### Variable selection based on regularized regression
-	l 		= model$lambda.min
-	var.ind	= rep(0,ncol(input.x))
-	var.ind[unlist(predict(model, newx=x.test, type="nonzero", s=l))] = 1
+	l 		= model$lambda.1se 		### use '1se' instead of 'min' to regularize as much as possible
+	var.ind	= rep(1,ncol(input.x))
 	coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
+	var.ind[abs(coeffs) < thres] = 0
+	
+	if (all(coeffs==0)) {			### regularized too much =>  try 'min'
+		plot(model)
+		l 		= model$lambda.min
+		var.ind	= rep(1,ncol(input.x))
+		coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
+		var.ind[abs(coeffs) < thres] = 0
+	}
+	
+	if (all(coeffs==0)) {			### still regularized too much =>  try EN w/ alpha=0.8
+		cat("Trying EN w/ alpha = 0.8")
+		par(mfrow=c(2,1)); plot(model)
+		model	= cv.glmnet(x.train, y.train, alpha=0.8,
+					  family="binomial", nfolds=k, nlambda=50, type.measure=crit)
+		plot(model)
+		
+		l 		= model$lambda.min
+		var.ind	= rep(1,ncol(input.x))
+		coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
+		var.ind[abs(coeffs) < thres] = 0
+	}
 	
 	return(list(lambda=l, vars=var.ind, coeffs=coeffs))
 }
