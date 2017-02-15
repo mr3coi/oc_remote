@@ -95,10 +95,10 @@ doLOGIT = function(train.dat, test.dat, resp.ind, marker) {
 # input			: input data.frame
 # resp.ind		: Column index of the response variable in both 'train.dat' and 'test.dat'
 # marker.mat	: A matrix w/ each row specifying which variables(cols) are included (1) or not (0)
-# k				: # of folds for CV
-# knn.NN		: # of nearest neighbors for kNN algorithm
+# CV.k			: # of folds for CV
+# knn.k			: # of nearest neighbors for kNN algorithm
 # svm.kernel	: type of kernel function to be used for SVM
-performance = function(input, resp.ind, marker.mat, CV.k, knn.NN=3, svm.kernel='radial') {
+performance = function(input, resp.ind, marker.mat, CV.k, knn.k=5, svm.kernel='radial') {
 	### Assert that the response variable column is a factor
 	if(!is.factor(input[,resp.ind])) stop("Make sure the column for response variable is a factor.")
 	
@@ -132,7 +132,7 @@ performance = function(input, resp.ind, marker.mat, CV.k, knn.NN=3, svm.kernel='
 		 		### Generate AUC values using the above submatrices and store in 'res.all'
 		 		tmp.rf		<- doRF(train.dat, test.dat, resp.ind, marker.mat[j,])
 		 		tmp.svm 	<- doSVM(train.dat, test.dat, resp.ind, marker.mat[j,], kernel=svm.kernel)
-		 		tmp.knn 	<- doKNN(train.dat, test.dat, resp.ind, marker.mat[j,], NN=knn.NN)
+		 		tmp.knn 	<- doKNN(train.dat, test.dat, resp.ind, marker.mat[j,], NN=knn.k)
 		 		tmp.logit 	<- doLOGIT(train.dat, test.dat, resp.ind, marker.mat[j,])
 		 		res.all[j,] <- c(tmp.rf, tmp.svm, tmp.knn, tmp.logit)
 		 	}

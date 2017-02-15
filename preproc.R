@@ -52,8 +52,8 @@ preProc = function(input, col_index, resp.var) {
 	useless = c("Pt_No.1","MEMO","Pt_No","Specimen_No","Name")
 	dataset = dataset[,-which(colnames(dataset) %in% useless)]
 	
-	##### Find and remove columns w/ (NA or "")/total ratio > 0.2
-	idx <- which(apply(dataset, 2, function(v) sum(is.na(v) | v==""))/nrow(dataset) > 0.2)
+	##### Find and remove columns w/ (NA or "")/total ratio > 0.1
+	idx <- which(apply(dataset, 2, function(v) sum(is.na(v) | v==""))/nrow(dataset) > 0.1)
 	dataset <- dataset[,-idx]
 	
 	##### Check that the response variable is still present in 'dataset'
@@ -123,7 +123,7 @@ preProc = function(input, col_index, resp.var) {
 	for (col in idx) {
 		if (length(grep(pattern,dataset[,col])) != 0) mul_choice = append(mul_choice, col)
 	}
-	idx = idx[idx != mul_choice]
+	if (!is.null(mul_choice)) idx = idx[idx != mul_choice]
 	
 		### Extract numeric values at the beginning
 	pattern = "(\\d).+"
@@ -184,7 +184,8 @@ preProc = function(input, col_index, resp.var) {
 			cat("col : ", col, ", levels # : ", nlevels(dataset[,col]), "\n")
 			
 			### Generate dummy variables (w/ multiple-choices taking separate columns)
-			dummy.mat = model.matrix(~dataset[,col])[,-1]
+			dummy.mat = gen_dummy(dataset[,col,drop=F])
+			#dummy.mat = model.matrix(~dataset[,col])[,-1]
 			
 			### Deal w/ multiple-choice cases
 			if (col %in% mul_choice) {
@@ -302,19 +303,14 @@ preProc = function(input, col_index, resp.var) {
 	# 	if (length(idx) == 0) break
 	# 	dataset = dataset[-idx,] 
 	# }
-	
-	##### Find indices of columns w/ (almost : 98%) uniform values and remove such columns
-	idx = which( apply(dataset, 2, function(v) { any(table(v)/length(v) > 0.98) }) )
-	sapply(idx,function(i) table(dataset[,i]))			### Check distributions of variables
-	dataset <- dataset[,-idx] 
 
-	##### Find and remove columns w/ NA/total ratio > 0.2
-	idx = which(apply(dataset, 2, function(v) sum(is.na(v))/nrow(dataset)) > 0.2)
+	##### Find and remove columns w/ NA/total ratio > 0.1
+	idx = which(apply(dataset, 2, function(v) sum(is.na(v))/nrow(dataset)) > 0.1)
 	if (length(idx) > 0) dataset <- dataset[,-idx]
 	
 	##### Find rows w/ NA/total ratio > 0.2
 	idx = which(apply(dataset, 1, function(v) sum(is.na(v))/ncol(dataset)) > 0.2)
-	dataset = dataset[-idx,]
+	if (length(idx) > 0) dataset = dataset[-idx,]
 	
 	return(dataset)
 }

@@ -38,7 +38,8 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 	coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
 	var.ind[abs(coeffs) < thres] = 0
 	
-	if (all(coeffs==0)) {			### regularized too much =>  try 'min'
+	if (all(abs(coeffs) < thres)) {			### regularized too much =>  try 'min'
+		cat("Trying w/ 'min' instead of '1se'...")
 		plot(model)
 		l 		= model$lambda.min
 		var.ind	= rep(1,ncol(input.x))
@@ -46,7 +47,8 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 		var.ind[abs(coeffs) < thres] = 0
 	}
 	
-	if (all(coeffs==0)) {			### still regularized too much =>  try EN w/ alpha=0.8
+	if (all(abs(coeffs) < thres)) {			### still regularized too much =>  try EN w/ alpha=0.8
+		### Plot the previous LASSO and new EN models to see what lambda values are taken
 		cat("Trying EN w/ alpha = 0.8")
 		par(mfrow=c(2,1)); plot(model)
 		model	= cv.glmnet(x.train, y.train, alpha=0.8,

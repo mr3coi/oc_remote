@@ -30,3 +30,14 @@ search_colname = function(df, name) { return(grep(name, colnames(df))) }
 #####
 extract_ind	= function(df,name) { 
 	which(sapply(strsplit(colnames(df),"\\n"), function(v) trimws(v[1])) == name) }
+
+
+gen_dummy = function(dataset,col) {
+	tmp   = model.matrix(~dataset[,col])[,-1]
+	dummy = matrix(nr=nrow(dataset),nc=ncol(tmp))
+	rownames(dummy) = 1:nrow(dataset)
+	colnames(dummy) = colnames(tmp)
+	dummy = tmp[match(rownames(dummy),rownames(tmp)),]
+	rownames(dummy) = 1:nrow(dataset)
+	return(dummy)
+}
