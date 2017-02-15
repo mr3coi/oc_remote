@@ -90,31 +90,21 @@ input 	= ova.db.csv[row_NA,]
 resp.var %in% colnames(input)
 resp.ind   = which(colnames(input) == resp.var)	# index of response variable
 
-##### Partition data into training / test sets
-inTrain 	= createDataPartition(input[,resp.ind],p=0.7,list=F)
-test.data 	= input[-inTrain,]
-train.data 	= input[inTrain,]
-
-which(apply(train.data,2,function(v) any(table(v) == length(v))))
-which(apply(test.data,2,function(v) any(table(v) == length(v))))
-apply(train.data,2,table,useNA="always")
-apply(test.data,2,table,useNA="always")
-
 ##### ============================================================================================
 ##### ============================================================================================
 ##### ============== Collinearity resolution ==================
 ##### ============================================================================================
 ##### ============================================================================================
 
-exp.vars = colnames(train.data)[colnames(train.data)!=resp.var]
+exp.vars = colnames(input)[colnames(input)!=resp.var]
 
 ##### Correlation b/w surviving explanatory variables
-#cor(train.data)
+#cor(input)
 
 ##### VIF calculation
-vif_alias  = alias(glm(Recurrence ~ ., family=binomial(link=logit), data=train.data))	### Check for perfect MC
+vif_alias  = alias(glm(Recurrence ~ ., family=binomial(link=logit), data=input))	### Check for perfect MC
 
-vif_result = vif(glm(Recurrence ~ ., family=binomial(link=logit), data=train.data))
+vif_result = vif(glm(Recurrence ~ ., family=binomial(link=logit), data=input))
 vif_result = cbind(match(names(vif_result),exp.vars),vif_result)
 colnames(vif_result) = c("exp.var_index","vif")
 vif_result = vif_result[order(vif_result[,2],decreasing=T),]
@@ -123,7 +113,7 @@ vif_high = vif_result[vif_result[,2] > 5,1]
 
 ##### Test for and remove collinear variables
 	### Generate matrix of p-values from independence tests for each variable pair
-corr.pairs  = pair.indep(train.data)
+corr.pairs  = pair.indep(input)
 
 	### Plot # of pairs against thresholds for p-value to find optimum threshold
 alpha_seq	= c(1 %o% 10^(-1:-15))
@@ -139,15 +129,15 @@ corr.edit 	= corr.pairs[corr.pairs[,3] < alpha,]
 corr.edit 	= corr.edit[order(corr.edit[,3]),]
 
 	### Check names of and plot variable pairs to check whether they are truly correlated
-# exp.vars = colnames(train.data)[colnames(train.data)!=resp.var]	## potential explanatory variables in 'train.data'
+# exp.vars = colnames(input)[colnames(input)!=resp.var]	## potential explanatory variables in 'input'
 # var1.ind = 12
 # var2.ind = 13
 # exp.vars[c(var1.ind,var2.ind)]
-# plot(train.data[,exp.vars[var1.ind]],train.data[,exp.vars[var2.ind]],xlab=exp.vars[var1.ind],ylab=exp.vars[var2.ind])
+# plot(input[,exp.vars[var1.ind]],input[,exp.vars[var2.ind]],xlab=exp.vars[var1.ind],ylab=exp.vars[var2.ind])
 
 	### Plot a network graph for visualization of key variables
 	### 	& Remove most highly linked nodes until each node is isolated
-nodes	= sort(unique(as.numeric(corr.edit[,-3])))		# Column indices of vars in 'train.data'
+nodes	= sort(unique(as.numeric(corr.edit[,-3])))		# Column indices of vars in 'input'
 net 	= matrix(0,nc=length(nodes),nr=length(nodes),dimnames=list(nodes,nodes))
 for (i in 1:nrow(net)) {
 	for (j in (i+1):ncol(net)) {
@@ -155,7 +145,7 @@ for (i in 1:nrow(net)) {
 			(corr.edit[,1] %in% nodes[j] & corr.edit[,2] %in% nodes[i])) ) net[i,j] = net[j,i] = 1
 	}
 }
-exclude_node_val = c() 		### Container for indices of variables in 'train.data'
+exclude_node_val = c() 		### Container for indices of variables in 'input'
 							###		that need to be removed due to dependency
 include = (1:length(nodes))[!(1:length(nodes)) %in% match(exclude_node_val,nodes)]
 net_obj = network(net[include,include],directed=F)
@@ -193,11 +183,11 @@ network.vertex.names(net_obj) = nodes[include]
 ggnet2(net_obj,size=5,label=T,color="color")
 length(exclude_node_val); exclude_node_val
 
-	### Update 'train.data' to exclude variables in 'exclude_node_val'
-orig_train.data = train.data; dim(orig_train.data) 								### Dataset w/ variables not removed (for regularization)
-train.data 	 	= train.data[,-as.numeric(exclude_node_val)]; dim(train.data)	### Dataset w/ variables removed (for AIC)
-orig_resp.ind 	= which(colnames(orig_train.data) == resp.var)
-resp.ind 	 	= which(colnames(train.data) == resp.var)
+	### Update 'input' to exclude variables in 'exclude_node_val'
+#orig_input 		= input; dim(orig_input) 							### Dataset w/ variables not removed (for regularization)
+reduc_input 	= input[,-as.numeric(exclude_node_val)]; dim(input)	### Dataset w/ variables removed (for AIC)
+orig_resp.ind 	= which(colnames(input) == resp.var)
+reduc_resp.ind 	= which(colnames(reduc_input) == resp.var)
 
 
 
@@ -207,61 +197,29 @@ resp.ind 	 	= which(colnames(train.data) == resp.var)
 ##### ============================================================================================
 ##### ============================================================================================
 
-##### Function call for stepwise AIC
-#result_AIC	= stepwiseAIC(train.data,resp.var)
-input = train.data
-result_AIC = stepwiseAIC(input,resp.var)
+### Function call for stepwise AIC
+result_AIC	= stepwiseAIC(reduc_input,resp.var)
 
-##### Function call for regularized regression
+### Function call for regularized regression
 eps = 10^(-3)		### Threshold size of coefficients
 k 	= 5
-result_auc	= regular.CV(orig_train.data, orig_resp.ind, k, thres=eps, crit="auc"); 	result_auc
-result_dev	= regular.CV(orig_train.data, orig_resp.ind, k, thres=eps, crit="dev"); 	result_dev
-result_cls	= regular.CV(orig_train.data, orig_resp.ind, k, thres=eps, crit="class");  result_cls
-result_mae	= regular.CV(orig_train.data, orig_resp.ind, k, thres=eps, crit="mae"); 	result_mae
+result_auc	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="auc"); 	result_auc
+result_dev	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="dev"); 	result_dev
+result_cls	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="class");  result_cls
+result_mae	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="mae"); 	result_mae
 
-##### 'marker.mat' generation
-AIC_0 = ifelse(exp.vars %in% colnames(train.data)[-ncol(train.data)][result_AIC$step0 == 1],1,0); AIC_0
-AIC_F = ifelse(exp.vars %in% colnames(train.data)[-ncol(train.data)][result_AIC$stepF == 1],1,0); AIC_F
+### 'marker.mat' generation
+AIC_0 = ifelse(exp.vars %in% colnames(reduc_input)[-ncol(reduc_input)][result_AIC$step0 == 1],1,0); AIC_0
+AIC_F = ifelse(exp.vars %in% colnames(reduc_input)[-ncol(reduc_input)][result_AIC$stepF == 1],1,0); AIC_F
 
-marker.mat 			 = rbind(AIC_0, AIC_F, result_auc$vars,
-					   		 result_dev$vars, result_cls$vars, result_mae$vars)
+marker.mat 			 = rbind(AIC_0, AIC_F, result_auc$vars, result_dev$vars, result_cls$vars, result_mae$vars)
 colnames(marker.mat) = exp.vars
 rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae")
-apply(marker.mat,1,sum)			### # of chosen variables
-sort(apply(marker.mat,2,sum),decreasing=T)
+# apply(marker.mat,1,sum)			### # of chosen variables
+# sort(apply(marker.mat,2,sum),decreasing=T)
 
-##### Run comparison
+### Run comparison
 	### CV.k : # of repetitions for CV
-eval.result = performance(test.data, orig_resp.ind, marker.mat, CV.k=c(3,5))
+eval.result = performance(input, orig_resp.ind, marker.mat, CV.k=c(3,5))
 eval.result[[3]]$MEAN_3; eval.result[[5]]$MEAN_5
 
-
-
-
-
-
-
-
-
-##########################################################
-########## Things to do #############
-##########################################################
-
-# - Check validity of independence-test-based variable reduction process (collinearity part)
-#	- Add code to allow manually choosing variables based on prior knowledge
-#	- Check why some p-values are >1, and whether it is ok to simply ignore them
-#	- Discuss how to undo the 'tangle' b/w variables and choose the best ones
-# - Data-related issues
-#	- Check whether "Parity" and "Other_sites" are actually categorical variables
-#	- Fix flawed data points in the given data
-#	- Check if too many variables are removed during preprocessing
-#	- Find a way to avoid removing rows again in 'Main Program' stage
-# - Discuss the validity / significance of the calculated results
-# - lasso.R
-#	- Check whether separating training/test sets is necessary for variable selection
-# - stepAIC.R
-#	- Check the necessity of the codes commented out
-# - perform_eval.R
-#	- (doLOGIT) difference b/w 'predict' and 'prediction' objects?
-# 	- Run kNN w/ various k values
