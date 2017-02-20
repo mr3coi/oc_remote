@@ -25,12 +25,14 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 	x.test	= input.x[-inTrain,]
 	y.test	= input.y[-inTrain,]
 	
+	alpha = ifelse(LASSO,1,0)
+	
 	##### Model generation
-	model	= cv.glmnet(x.train, y.train, alpha=ifelse(LASSO,1,0),
-					  family="binomial", nfolds=k, nlambda=50, type.measure=crit)
+	model	= cv.glmnet(x.train, y.train, alpha=alpha,
+					  family="binomial", nfolds=k, nlambda=100, type.measure=crit)
 	
 	##### Plot the generated model
-	#plot(model)
+	plot(model)
 	
 	##### Variable selection based on regularized regression
 	l 		= model$lambda.1se 		### use '1se' instead of 'min' to regularize as much as possible
@@ -39,27 +41,35 @@ regular.CV = function(input, resp.ind, k=3, LASSO=T, thres=10^(-5), crit="devian
 	var.ind[abs(coeffs) < thres] = 0
 	
 	if (all(abs(coeffs) < thres)) {			### regularized too much =>  try 'min'
-		cat("Trying w/ 'min' instead of '1se'...")
-		plot(model)
+		cat("Trying w/ 'min' instead of '1se'...\n")
 		l 		= model$lambda.min
 		var.ind	= rep(1,ncol(input.x))
 		coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
 		var.ind[abs(coeffs) < thres] = 0
 	}
 	
-	if (all(abs(coeffs) < thres)) {			### still regularized too much =>  try EN w/ alpha=0.8
-		### Plot the previous LASSO and new EN models to see what lambda values are taken
-		cat("Trying EN w/ alpha = 0.8")
-		par(mfrow=c(2,1)); plot(model)
-		model	= cv.glmnet(x.train, y.train, alpha=0.8,
-					  family="binomial", nfolds=k, nlambda=50, type.measure=crit)
-		plot(model)
-		
-		l 		= model$lambda.min
+	while (all(abs(coeffs) < thres)) {			### regularized too much =>  try 'min'
+		cat("Doubling lambda...\n")
+		l = l*0.5
 		var.ind	= rep(1,ncol(input.x))
 		coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
 		var.ind[abs(coeffs) < thres] = 0
 	}
+
+	# while (alpha > 0.1 && all(abs(coeffs) < thres)) {			### still regularized too much =>  try EN w/ alpha=0.8
+	# 	alpha = alpha - 0.2
+	# 	### Plot the previous LASSO and new EN models to see what lambda values are taken
+	# 	cat("Trying EN w/ alpha = ", alpha,'\n')
+	# 	par(mfrow=c(2,1)); plot(model)
+	# 	model	= cv.glmnet(x.train, y.train, alpha=alpha,
+	# 				  family="binomial", nfolds=k, nlambda=50, type.measure=crit)
+	# 	plot(model)
+	# 	
+	# 	l 		= model$lambda.min
+	# 	var.ind	= rep(1,ncol(input.x))
+	# 	coeffs	= as.vector(predict(model, newx=x.test, type="coefficients", s=l))[-1]
+	# 	var.ind[abs(coeffs) < thres] = 0
+	# }
 	
 	return(list(lambda=l, vars=var.ind, coeffs=coeffs))
 }

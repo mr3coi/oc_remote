@@ -121,8 +121,9 @@ performance = function(input, resp.ind, marker.mat, CV.k, knn.k=5, svm.kernel='r
 		 	cname = paste(algs, 'AUC', sep='_')
 		 	res.all = matrix(nrow=nrow(marker.mat), ncol=length(algs))
 		 	colnames(res.all) = cname
-		 	rownames(res.all) = apply(marker.mat, 1, function(mm) {paste(which(mm==1), collapse = ',')})
-		 	rownames(res.all) = paste0(rownames(marker.mat),'_',rownames(res.all))
+		 	# rownames(res.all) = apply(marker.mat, 1, function(mm) {paste(which(mm==1), collapse = ',')})
+		 	# rownames(res.all) = paste0(rownames(marker.mat),'_',rownames(res.all))
+		 	rownames(res.all) = rownames(marker.mat)
 		 	
 		 	### Call each function to compute AUC's
 		 	for( j in 1:nrow(marker.mat) ) {

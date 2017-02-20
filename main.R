@@ -17,11 +17,13 @@ library(car)
 #require(devtools); devtools::install_github("briatte/ggnet")	### Install if necessary
 library(ggnet); library(network); library(sna)
 
+par(mfrow=c(1,1)); graphics.off(); rm(list=ls())
 wd 		 <- "/Users/SJC/Documents/practice/internship/ovarian_cancer"
 datafile <- "ova_db2.csv" 
 varfile  <- "ova_variable.csv" 
 setwd(wd)
-set.seed(51)
+seed = 51
+set.seed(seed)
 
 source("preproc.R")
 source("stepAIC.R")
@@ -42,12 +44,13 @@ ova.db.csv = ova.db.csv[1:235,]
 
 ##### Extract relevant portion of the given source data and preprocess it
 col_index  = 1:103				### Column indices of explanatory variables to use
-resp.var   = "Recurrence"		### Name of response variable
+#resp.var   = "Recurrence"		### Name of response variable
+resp.var   = "Platinum_user_only_6mo"
 ova.db.csv = preProc(ova.db.csv,col_index,resp.var)
 
 ##### Extract relevant sub-data.frame from given data
 	### Exclude columns that are meaningless, irrelevant, or redundant
-avoid 	   = c("BMI","BMI_category1_2","BMI_category1_3","BMI_category1_4","Origin_2.1","Origin_3.1",
+avoid 	   = c("BMI","BMI_category1_2","BMI_category1_3","BMI_category1_4","Origin_2.1","Origin_3.1","Origin.1_3",
 			   "Lymphocyte","Monocyte","Segmented_neutrophil","PLT")
 avoid 	   = match(avoid,colnames(ova.db.csv),nomatch=ncol(ova.db.csv)+1)
 	### Exclude all variables w/ column indices in 'avoid'
@@ -84,7 +87,7 @@ if (length(idx) > 0) ova.db.csv <- ova.db.csv[,-idx]
 ##### Preprocess : remove NA's	=>	'input' (final data form)
 row_NA	= apply(ova.db.csv,1,function(v) {sum(is.na(v)) == 0}); sum(row_NA)
 input 	= ova.db.csv[row_NA,]
-#input 	= input[,c(1:31,ncol(input))]		### For categories 1-7
+#input 	= input[,c(1:28,ncol(input))]		### For categories 1-7
 
 ##### Check that the response variable still survives, and compute its column index
 resp.var %in% colnames(input)
@@ -102,9 +105,10 @@ exp.vars = colnames(input)[colnames(input)!=resp.var]
 #cor(input)
 
 ##### VIF calculation
-vif_alias  = alias(glm(Recurrence ~ ., family=binomial(link=logit), data=input))	### Check for perfect MC
+f = paste(resp.var,"~",".",sep=" ")
+vif_alias  = alias(glm(f, family=binomial(link=logit), data=input))	### Check for perfect MC
 
-vif_result = vif(glm(Recurrence ~ ., family=binomial(link=logit), data=input))
+vif_result = vif(glm(f, family=binomial(link=logit), data=input))
 vif_result = cbind(match(names(vif_result),exp.vars),vif_result)
 colnames(vif_result) = c("exp.var_index","vif")
 vif_result = vif_result[order(vif_result[,2],decreasing=T),]
@@ -116,11 +120,11 @@ vif_high = vif_result[vif_result[,2] > 5,1]
 corr.pairs  = pair.indep(input)
 
 	### Plot # of pairs against thresholds for p-value to find optimum threshold
-alpha_seq	= c(1 %o% 10^(-1:-15))
+alpha_seq	= c(1 %o% 10^(-3:-15))
 pair_count	= sapply(alpha_seq, function(v) { nrow(corr.pairs[corr.pairs[,3] < v,]) })
 plot(-log10(alpha_seq),pair_count,xlab="-log10(alpha)",ylab="# of variable pairs",
 	 main="dist. of dependent variable pairs\nper threshold")
-abline(h=100)
+#abline(h=100)
 
 	### Extract all pairs w/ p-value < threshold(alpha)	and sort by p-value in increasing order
 alpha  = 0.05 / nrow(corr.pairs)	### alpha chosen by Bonferroni correction
@@ -181,11 +185,11 @@ net_obj %v% "vif"   = ifelse(nodes[include] %in% vif_high, "MC", "non-MC")
 net_obj %v% "color" = ifelse(net_obj %v% "vif" == "MC", "steelblue", "grey")
 network.vertex.names(net_obj) = nodes[include]
 ggnet2(net_obj,size=5,label=T,color="color")
-length(exclude_node_val); exclude_node_val
+length(exclude_node_val); colnames(input)[as.numeric(exclude_node_val)]
 
 	### Update 'input' to exclude variables in 'exclude_node_val'
 #orig_input 		= input; dim(orig_input) 							### Dataset w/ variables not removed (for regularization)
-reduc_input 	= input[,-as.numeric(exclude_node_val)]; dim(input)	### Dataset w/ variables removed (for AIC)
+reduc_input 	= input[,-as.numeric(exclude_node_val)]; dim(reduc_input)	### Dataset w/ variables removed (for AIC)
 orig_resp.ind 	= which(colnames(input) == resp.var)
 reduc_resp.ind 	= which(colnames(reduc_input) == resp.var)
 
@@ -198,14 +202,20 @@ reduc_resp.ind 	= which(colnames(reduc_input) == resp.var)
 ##### ============================================================================================
 
 ### Function call for stepwise AIC
+set.seed(seed)
 result_AIC	= stepwiseAIC(reduc_input,resp.var)
 
 ### Function call for regularized regression
 eps = 10^(-3)		### Threshold size of coefficients
-k 	= 5
+k 	= 3
+par(mfrow=c(2,2))
+set.seed(seed)
 result_auc	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="auc"); 	result_auc
+set.seed(seed)
 result_dev	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="dev"); 	result_dev
-result_cls	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="class");  result_cls
+set.seed(seed)
+result_cls	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="class"); result_cls
+set.seed(seed)
 result_mae	= regular.CV(input, orig_resp.ind, k, thres=eps, crit="mae"); 	result_mae
 
 ### 'marker.mat' generation
@@ -215,11 +225,14 @@ AIC_F = ifelse(exp.vars %in% colnames(reduc_input)[-ncol(reduc_input)][result_AI
 marker.mat 			 = rbind(AIC_0, AIC_F, result_auc$vars, result_dev$vars, result_cls$vars, result_mae$vars)
 colnames(marker.mat) = exp.vars
 rownames(marker.mat) = c("AIC_0","AIC_F","reg_auc","reg_dev","reg_cls","reg_mae")
-# apply(marker.mat,1,sum)			### # of chosen variables
-# sort(apply(marker.mat,2,sum),decreasing=T)
 
 ### Run comparison
 	### CV.k : # of repetitions for CV
-eval.result = performance(input, orig_resp.ind, marker.mat, CV.k=c(3,5))
-eval.result[[3]]$MEAN_3; eval.result[[5]]$MEAN_5
+eval.result = performance(input, orig_resp.ind, marker.mat, CV.k=3)
+#eval.result[[5]]$MEAN_5
 
+### Output results
+apply(marker.mat,1,sum)							### # of chosen variables per each variable selection method
+sort(apply(marker.mat,2,sum),decreasing=T)		### Variables in order of frequent inclusion
+markers = apply(marker.mat,1, function(row) colnames(marker.mat)[row==1]); markers
+eval.result[[3]]$MEAN_3

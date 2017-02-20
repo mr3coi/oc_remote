@@ -34,9 +34,9 @@ preProc = function(input, col_index, resp.var) {
 	dataset[dataset==""] = NA
 
 	
-	
-	
-	
+	##### Remove NA rows of response variable
+	idx = which(is.na(dataset[,extract_ind(dataset,resp.var)]))
+	dataset = dataset[-idx,]
 	
 	
 	
@@ -154,6 +154,9 @@ preProc = function(input, col_index, resp.var) {
 	# rec.ind = extract_ind(dataset,"Recurrence")
 	# dataset[,rec.ind][!is.na(dataset[,rec.ind]) & dataset[,rec.ind]==2] <- 1
 	
+	##### Convert character values in dataset into numeric values
+	dataset <- as.data.frame(apply(dataset, 2, as.numeric))
+	
 	##### Classify b/w categorical and numerical variables
 	factor_check 		= sapply(strsplit(colnames(dataset),split="\n"), 
 							function(v) ifelse(length(v) > 1,1,0))
@@ -169,9 +172,11 @@ preProc = function(input, col_index, resp.var) {
 	##### Choose main titles as column names (removing choices) and remove spaces within the main titles
 	colnames(dataset) = names(factor_check)
 	
+	##### Check that all variables are either factor or numeric
+	if (!all(unlist(lapply(dataset, function(col) is.factor(col) || is.numeric(col))))) stop("Conversion to numeric/factor failed.")
 	
-	
-	
+	##### Normalize numeric variables
+	dataset = as.data.frame(lapply(dataset,function(col) if(is.numeric(col)) col = scale(col) else col = col))
 	
 	
 	
@@ -261,8 +266,6 @@ preProc = function(input, col_index, resp.var) {
 	
 	
 	
-	##### Convert character values in dataset into numeric values		### Obsolete
-	# dataset <- as.data.frame(apply(dataset, 2, as.numeric))
 	
 	##### Check for flawed values in remaining columns
 	# lv_data  = unlist(lapply(strsplit(colnames(dataset),split="\n"), length)) - 1
